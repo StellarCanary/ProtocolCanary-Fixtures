@@ -1,0 +1,24 @@
+# Protocol 28 compatibility pack
+
+Implemented in Stellar Core 28.0.0, Stellar RPC 28.0.0 (integration-tested
+against Soroban host 28.0.1), and the official `stellar-xdr` 28.0.0 crate.
+Includes CAP-0083, CAP-0085, and CAP-0086.
+
+This directory holds no `manifest.toml` — see the repository root
+[`README.md`](../README.md#repository-relationship) for why: the
+`Protocol-Canary` loader parses every `*.toml` file it finds as a fixture,
+so a separate enumeration file in this format would either be ignored or,
+worse, misparsed as a broken fixture. The fixture files below *are* the
+enumeration.
+
+| Fixture | Surface | CAP | What it proves |
+|---|---|---|---|
+| [`xdr/cap-0083/p28-xdr-cap83-empty-tx-set.toml`](xdr/cap-0083/p28-xdr-cap83-empty-tx-set.toml) | xdr | CAP-0083 | A `StellarValue` using `STELLAR_VALUE_EMPTY_TX_SET` round-trips byte-for-byte. |
+| [`xdr/cap-0085/p28-xdr-cap85-external-ref-roundtrip.toml`](xdr/cap-0085/p28-xdr-cap85-external-ref-roundtrip.toml) | xdr | CAP-0085 | A `ContractExecutable` using `CONTRACT_EXECUTABLE_EXTERNAL_REF` round-trips byte-for-byte. |
+| [`xdr/cap-0085/p28-xdr-cap85-external-ref-malformed.toml`](xdr/cap-0085/p28-xdr-cap85-external-ref-malformed.toml) | xdr | CAP-0085 | A truncated `ContractExecutable::ExternalRef` encoding is correctly rejected, not silently accepted. |
+| [`rpc/p28-rpc-network.toml`](rpc/p28-rpc-network.toml) | rpc | — | A configured RPC endpoint's `getNetwork` reports protocol 28 with a `passphrase` field. |
+| [`soroban/p28-soroban-native-asset-name.toml`](soroban/p28-soroban-native-asset-name.toml) | soroban | — | The full construct → `simulateTransaction` → result pipeline works against real Protocol 28 infrastructure. |
+
+See [`../docs/protocol-28.md`](../docs/protocol-28.md) for what this pack
+checks, what it deliberately does not (including why CAP-0086 has no
+fixture yet), and source provenance for every assertion above.
