@@ -1,0 +1,80 @@
+"""Pack-level checks for the Protocol 28 fixture pack.
+
+These are structural/offline checks (no network, no execution) that this
+specific release's pack matches its own documented inventory. The actual
+end-to-end verification that these fixtures pass when run by
+Protocol-Canary against live testnet is recorded in each fixture's header
+comment and in docs/protocol-28.md, not re-run here — see CONTRIBUTING.md
+on why CI does not require a live RPC endpoint.
+"""
+from __future__ import annotations
+
+import importlib.util
+import sys
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+VALIDATE_PATH = REPO_ROOT / "tools" / "validate" / "validate.py"
+
+_spec = importlib.util.spec_from_file_location("validate", VALIDATE_PATH)
+validate = importlib.util.module_from_spec(_spec)
+assert _spec.loader is not None
+sys.modules["validate"] = validate
+_spec.loader.exec_module(validate)
+
+PACK = REPO_ROOT / "protocol-28"
+
+EXPECTED_IDS_BY_SURFACE = {
+    "xdr": {
+        "p28-xdr-cap83-empty-tx-set",
+        "p28-xdr-cap85-external-ref-roundtrip",
+        "p28-xdr-cap85-external-ref-malformed",
+    },
+    "rpc": {"p28-rpc-network"},
+    "soroban": {"p28-soroban-native-asset-name"},
+}
+
+
+class Protocol28PackTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.report = validate.validate_directory(PACK)
+        fixtures = [
+            validate.load_fixture(p, validate.Report())
+            for p in validate.find_fixture_files(PACK)
+        ]
+        self.fixtures = [fx for fx in fixtures if fx is not None]
+
+    def test_pack_is_structurally_valid(self) -> None:
+        self.assertEqual(self.report.errors, [])
+
+    def test_every_fixture_targets_protocol_28(self) -> None:
+        for fx in self.fixtures:
+            self.assertEqual(fx.data.get("protocol"), 28, fx.path)
+
+    def test_every_fixture_has_a_source_reference(self) -> None:
+        for fx in self.fixtures:
+            self.assertTrue(fx.data.get("source_reference"), fx.path)
+
+    def test_expected_fixture_ids_are_present_per_surface(self) -> None:
+        by_surface: dict[str, set[str]] = {"xdr": set(), "rpc": set(), "soroban": set()}
+        for fx in self.fixtures:
+            surface = fx.data.get("surface")
+            if surface in by_surface:
+                by_surface[surface].add(fx.data.get("id"))
+        self.assertEqual(by_surface, EXPECTED_IDS_BY_SURFACE)
+
+    def test_no_fixture_claims_cap_0086(self) -> None:
+        # CAP-0086 is a documented gap (see docs/protocol-28.md); a fixture
+        # claiming to cover it would be fabricated coverage.
+        for fx in self.fixtures:
+            self.assertNotIn("cap-0086", fx.data.get("category", "").lower(), fx.path)
+            self.assertNotIn("CAP-0086", fx.data.get("source_reference", ""), fx.path)
+
+    def test_protocol_27_pack_has_no_fixtures_yet(self) -> None:
+        p27 = REPO_ROOT / "protocol-27"
+        self.assertEqual(validate.find_fixture_files(p27), [])
+
+
+if __name__ == "__main__":
+    unittest.main()
