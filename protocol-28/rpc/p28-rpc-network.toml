@@ -1,0 +1,43 @@
+# Protocol 28 / RPC network identity.
+#
+# Calls the real Stellar RPC `getNetwork` method and checks that the
+# configured endpoint reports protocol 28 with a string `passphrase`
+# field present. This is a network-identity check: it is meant to fail,
+# honestly, the moment a configured RPC endpoint stops reporting protocol
+# 28 (for example, once that endpoint upgrades past it), rather than
+# silently continuing to report success.
+#
+# Verified live against https://soroban-testnet.stellar.org on 2026-09-02:
+#
+#   curl -s -X POST https://soroban-testnet.stellar.org \
+#     -H 'Content-Type: application/json' \
+#     -d '{"jsonrpc":"2.0","id":1,"method":"getNetwork"}'
+#   => {"jsonrpc":"2.0","id":1,"result":{
+#        "friendbotUrl":"https://friendbot.stellar.org/",
+#        "passphrase":"Test SDF Network ; September 2015",
+#        "protocolVersion":28}}
+#
+# Reference: https://developers.stellar.org/docs/data/apis/rpc/api-reference/methods/getNetwork
+
+id = "p28-rpc-network"
+protocol = 28
+surface = "rpc"
+category = "network"
+description = "getNetwork reports protocol 28 and a passphrase"
+source_reference = "https://developers.stellar.org/docs/data/apis/rpc/api-reference/methods/getNetwork"
+
+method = "get-network"
+
+[[assert]]
+kind = "field-exists"
+field = "passphrase"
+
+[[assert]]
+kind = "field-type"
+field = "passphrase"
+expected_type = "string"
+
+[[assert]]
+kind = "field-equals"
+field = "protocolVersion"
+value = 28
