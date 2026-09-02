@@ -1,0 +1,44 @@
+# Protocol 28 / CAP-0083: STELLAR_VALUE_EMPTY_TX_SET.
+#
+# CAP-0083 lets validators vote to drop a transaction set from the ledger
+# being closed by adding a new StellarValueType case,
+# STELLAR_VALUE_EMPTY_TX_SET (discriminant 2), to the StellarValue union's
+# `ext`. Per the CAP, a StellarValue using this case carries the zero hash
+# in its top-level `txSetHash`, with the real hash of the dropped
+# transaction set moved into the nested `proposedValue.txSetHash`:
+#
+#   union switch (StellarValueType v) {
+#   ...
+#   case STELLAR_VALUE_EMPTY_TX_SET:
+#       struct {
+#           Hash txSetHash;
+#           Hash previousLedgerHash;
+#           uint32 previousLedgerVersion;
+#           LedgerCloseValueSignature lcValueSignature;
+#       } proposedValue;
+#   } ext;
+#
+# This fixture's value_base64 is a real, well-formed encoding of that
+# shape, produced by constructing a stellar_xdr::StellarValue value
+# in-memory with the official `stellar-xdr` 28.0.0 crate (the same crate
+# Protocol-Canary's canary-xdr runner uses to decode it) and calling
+# to_xdr_base64 — not hand-assembled bytes. The top-level tx_set_hash is
+# the zero hash; ext.EmptyTxSet.tx_set_hash is a distinct, deliberately
+# non-zero placeholder hash representing "the dropped set"; close_time,
+# previous_ledger_hash, previous_ledger_version (28), and the
+# lc_value_signature's node_id/signature are otherwise-arbitrary but
+# well-typed fixture values — this fixture asserts the *shape* round-trips,
+# not that these are values observed on a live ledger.
+#
+# Reference: https://github.com/stellar/stellar-protocol/blob/master/core/cap-0083.md
+
+id = "p28-xdr-cap83-empty-tx-set"
+protocol = 28
+surface = "xdr"
+category = "cap-0083"
+description = "StellarValue using the CAP-0083 STELLAR_VALUE_EMPTY_TX_SET ext round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-protocol/blob/master/core/cap-0083.md"
+
+type = "StellarValue"
+kind = "roundtrip"
+value_base64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaIwDgAAAAAAAAAACEREREREREREREREREREREREREREREREREREREREREREiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIgAAABwAAAAAMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAABARERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERERA=="
