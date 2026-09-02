@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/StellarCanary/ProtocolCanary-Fixtures/schemas/fixture-v1.schema.json",
+  "title": "Protocol Canary fixture (schema_version 1)",
+  "description": "A single compatibility-assertion fixture consumed by StellarCanary/Protocol-Canary's canary-fixtures loader. This schema mirrors that implementation (see Protocol-Canary's docs/fixture-contract.md); it is a convenience for editor/CI linting in this repository, not an independent specification. On any disagreement, Protocol-Canary's implementation is authoritative.",
+  "type": "object",
+  "required": ["id", "protocol", "surface", "category", "description"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "Unique across every fixture loaded from a given --fixtures-dir, not just within this file. Convention (not enforced by the loader): p<protocol>-<surface>-<slug>."
+    },
+    "protocol": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The Stellar protocol version this fixture targets. A run whose --protocol does not match is skipped, not failed."
+    },
+    "surface": {
+      "type": "string",
+      "enum": ["xdr", "rpc", "soroban"],
+      "description": "Selects which surface crate parses the fixture body. Any other value fails to parse."
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Free-text grouping, e.g. a CAP slug (\"cap-0083\") or \"network\"/\"smoke\". Avoid vague values such as misc/other/test/general."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_reference": {
+      "type": "string",
+      "minLength": 1,
+      "description": "An authoritative upstream reference: a CAP identifier/URL, an upstream XDR definition, or an official release/API doc URL. Strongly expected for any protocol-specific fixture."
+    },
+    "required_capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "soroban-contract",
+          "rpc-client",
+          "stellar-sdk-dependency",
+          "wasm-artifact",
+          "raw-ledger-access"
+        ]
+      },
+      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed."
+    },
+    "input_file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to an externally stored input file, relative to this fixture file's own directory. Existence is checked by the validator; the loader does not read the file's contents itself."
+    },
+    "expected_file": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Path to an externally stored expected-output file, relative to this fixture file's own directory."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "surface": { "const": "xdr" } } },
+      "then": {
+        "required": ["type", "kind", "value_base64"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["StellarValue", "ContractExecutable"],
+            "description": "The XDR type name canary-xdr should decode value_base64 as."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["decode-success", "decode-failure", "roundtrip", "encode-equals"]
+          },
+          "value_base64": { "type": "string", "minLength": 1 },
+          "expected_base64": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Required only when kind = encode-equals."
+          }
+        },
+        "if": { "properties": { "kind": { "const": "encode-equals" } } },
+        "then": { "required": ["expected_base64"] }
+      }
+    },
+    {
+      "if": { "properties": { "surface": { "const": "rpc" } } },
+      "then": {
+        "required": ["method", "assert"],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": ["get-network", "get-latest-ledger"]
+          },
+          "assert": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["kind", "field"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["field-exists", "field-type", "field-equals"]
+                },
+                "field": { "type": "string", "minLength": 1 },
+                "value": {},
+                "expected_type": {
+                  "type": "string",
+                  "enum": ["string", "integer", "boolean", "array", "object"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "surface": { "const": "soroban" } } },
+      "then": {
+        "required": [
+          "source_account",
+          "contract_id",
+          "function",
+          "sequence_number",
+          "expect"
+        ],
+        "properties": {
+          "source_account": { "type": "string", "minLength": 1 },
+          "contract_id": { "type": "string", "minLength": 1 },
+          "function": { "type": "string", "minLength": 1 },
+          "sequence_number": { "type": "integer" },
+          "args": { "type": "array" },
+          "expect": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["simulation-success", "simulation-error"]
+              },
+              "message_contains": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
