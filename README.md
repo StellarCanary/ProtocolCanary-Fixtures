@@ -25,9 +25,12 @@ Protocol specification / upstream implementation
 
 `ProtocolCanary-Fixtures` defines **what** should be tested. The
 [`StellarCanary/Protocol-Canary`](https://github.com/StellarCanary/Protocol-Canary)
-CLI defines **how** the test is executed. This repository contains no
-business logic, no server, no database, and no executable fixture code — it
-is a versioned corpus of declarative test data.
+CLI defines **how** the test is executed.
+[`StellarCanary/ProtocolCanary-Action`](https://github.com/StellarCanary/ProtocolCanary-Action)
+runs that CLI against this repository's fixtures in GitHub CI. This
+repository contains no business logic, no server, no database, and no
+executable fixture code — it is a versioned corpus of declarative test
+data.
 
 ## Repository relationship
 
