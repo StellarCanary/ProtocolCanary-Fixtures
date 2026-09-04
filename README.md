@@ -1,5 +1,8 @@
 # ProtocolCanary-Fixtures
 
+[![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Canonical compatibility fixtures for Stellar Protocol Canary.
 
 ## Purpose
