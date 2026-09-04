@@ -37,6 +37,13 @@ untrusted input by any consumer, including `Protocol-Canary` itself:
 structural problems (schema conformance, duplicate IDs, missing files). It
 never executes a fixture's assertion and never makes a network call.
 
+## Audit status
+
+No formal third-party security audit has been performed on this
+repository. Confidence in the "fixtures are data, not code" claim comes
+from the fixture schema itself (no executable field exists) and the
+validator's tests, not from an external review.
+
 ## Reporting a vulnerability
 
 If you find a security issue in this repository — a fixture that could be
