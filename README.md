@@ -125,3 +125,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to add a fixture.
 See [`SECURITY.md`](SECURITY.md). In short: no secrets, no private keys, no
 executable fixture code, no transaction submission — fixture files must be
 treated as untrusted input by any consumer.
+
+## Code of Conduct
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
