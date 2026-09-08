@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="500" viewBox="0 0 1600 500" role="img" aria-labelledby="title desc">
+  <title id="title">ProtocolCanary-Fixtures</title>
+  <desc id="desc">Protocol test fixtures and assertions for Stellar protocol compatibility.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4fbf7"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f8f63"/>
+      <stop offset="1" stop-color="#39b978"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0b2d24" flood-opacity="0.10"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="500" rx="28" fill="url(#bg)"/>
+
+  <!-- soft background waves -->
+  <path d="M0 408 C220 330 350 470 610 398 S1040 310 1240 380 S1450 430 1600 345 V500 H0Z" fill="#dff5e9"/>
+  <path d="M0 450 C230 385 370 500 610 435 S1010 360 1220 420 S1450 465 1600 400 V500 H0Z" fill="#c9ecdb" opacity=".78"/>
+
+  <!-- right-side star / orbit motif -->
+  <path d="M1225 105 C1400 50 1495 75 1565 160" fill="none" stroke="#98dcb8" stroke-width="2" stroke-dasharray="8 10"/>
+  <g fill="#0e8060">
+    <circle cx="1490" cy="92" r="5"/><circle cx="1532" cy="120" r="3"/><circle cx="1447" cy="65" r="3"/>
+  </g>
+  <g transform="translate(1510 72)" fill="#1b5a48" opacity=".9">
+    <path d="M0-30 L6-7 L30 0 L6 6 L0 30 L-6 6 L-30 0 L-6-7Z"/>
+  </g>
+
+  <!-- left icon -->
+  <g transform="translate(70 86)" filter="url(#shadow)">
+    <polygon points="118,0 218,58 218,174 118,232 18,174 18,58" fill="#ffffff" stroke="url(#green)" stroke-width="8"/>
+    <g transform="translate(48 42)" fill="none" stroke="#1f8b63" stroke-width="8" stroke-linejoin="round">
+      <path d="M0 42 L68 0 L136 42"/>
+      <path d="M0 76 L68 118 L136 76"/>
+      <path d="M0 112 L68 154 L136 112"/>
+    </g>
+    <path d="M48 84 L68 96 L88 84 L88 120 L68 132 L48 120Z" fill="#1f9b66" opacity=".18"/>
+  </g>
+
+  <!-- title block -->
+  <text x="350" y="160" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="74" font-weight="800" fill="#0b1f33">ProtocolCanary-</text>
+  <text x="350" y="235" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="76" font-weight="800" fill="#159461">Fixtures</text>
+  <text x="354" y="284" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" letter-spacing="3" font-weight="700" fill="#4b6473">PROTOCOL TEST FIXTURES &amp; ASSERTIONS</text>
+
+  <text x="355" y="338" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="27" font-style="italic" font-weight="600" fill="#168d60">Real scenarios. Reliable checks.</text>
+  <path d="M354 350 C480 366 640 366 760 351" fill="none" stroke="#168d60" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- fixture stack -->
+  <g transform="translate(865 170)" filter="url(#shadow)">
+    <g transform="translate(0 84)">
+      <rect width="295" height="42" rx="12" fill="#ffffff" stroke="#173346" stroke-width="4"/>
+      <rect x="-10" y="-10" width="295" height="42" rx="12" fill="#eaf7f0" stroke="#159461" stroke-width="4"/>
+    </g>
+    <g transform="translate(-8 44)">
+      <rect width="295" height="42" rx="12" fill="#ffffff" stroke="#173346" stroke-width="4"/>
+    </g>
+    <g transform="translate(-16 4)">
+      <rect width="295" height="42" rx="12" fill="#ffffff" stroke="#173346" stroke-width="4"/>
+    </g>
+    <g transform="translate(-24 -36)">
+      <rect width="295" height="42" rx="12" fill="#ffffff" stroke="#173346" stroke-width="4"/>
+      <text x="22" y="28" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="800" fill="#0b1f33">FIXTURE PACK</text>
+      <circle cx="257" cy="21" r="14" fill="#159461"/>
+      <path d="M250 21 l5 5 l10 -11" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- canary -->
+  <g transform="translate(1100 92)">
+    <ellipse cx="108" cy="197" rx="88" ry="16" fill="#173346" opacity=".10"/>
+    <path d="M46 178 C66 125 63 69 105 48 C148 26 202 46 217 82 C231 117 207 161 164 177 C129 191 87 191 46 178Z" fill="#f7bf22"/>
+    <path d="M113 75 C150 51 190 62 201 91 C181 78 157 85 144 112 C127 104 113 91 113 75Z" fill="#e7a514" opacity=".85"/>
+    <path d="M63 158 C30 174 10 193 0 202 C34 197 82 183 105 157Z" fill="#f0ab14"/>
+    <circle cx="184" cy="79" r="5.5" fill="#101f2b"/>
+    <path d="M214 91 l28 12 l-27 12Z" fill="#a87019"/>
+    <path d="M116 177 L103 210 M153 177 L162 210" stroke="#7a5a1a" stroke-width="7" stroke-linecap="round"/>
+    <path d="M93 211 C112 205 123 205 137 211 M153 211 C170 205 181 206 194 212" fill="none" stroke="#173346" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- test cards -->
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <g transform="translate(1150 270)">
+      <rect width="270" height="62" rx="14" fill="#ffffff" stroke="#3c8bc8" stroke-width="3"/>
+      <text x="22" y="39" font-size="20" font-weight="800" fill="#245f90">&lt;/&gt;  XDR Tests</text>
+      <circle cx="239" cy="31" r="13" fill="#22a36b"/>
+      <path d="M233 31 l5 5 l8-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(1190 342)">
+      <rect width="270" height="62" rx="14" fill="#f5fffa" stroke="#4ab18b" stroke-width="3"/>
+      <text x="22" y="39" font-size="20" font-weight="800" fill="#227d5c">⌁  RPC Tests</text>
+      <circle cx="239" cy="31" r="13" fill="#22a36b"/>
+      <path d="M233 31 l5 5 l8-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(1230 414)">
+      <rect width="270" height="62" rx="14" fill="#fbf9ff" stroke="#8a74c9" stroke-width="3"/>
+      <text x="22" y="39" font-size="20" font-weight="800" fill="#614aa2">◇  Soroban Tests</text>
+      <circle cx="239" cy="31" r="13" fill="#22a36b"/>
+      <path d="M233 31 l5 5 l8-10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- connector -->
+  <path d="M821 196 C847 196 842 195 865 195" fill="none" stroke="#7bcaa7" stroke-width="3" stroke-dasharray="5 8"/>
+  <circle cx="837" cy="196" r="5" fill="#159461"/>
+
+  <!-- bottom caption -->
+  <g transform="translate(75 445)" font-family="Inter,Segoe UI,Arial,sans-serif" fill="#496574">
+    <text font-size="17" font-weight="700" letter-spacing="2">STELLAR PROTOCOL COMPATIBILITY</text>
+    <text x="1345" font-size="17" font-weight="700">OPEN SOURCE  •  DETERMINISTIC  •  REVIEWABLE</text>
+  </g>
+</svg>
