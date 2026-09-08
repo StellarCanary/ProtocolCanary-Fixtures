@@ -1,9 +1,13 @@
 # ProtocolCanary-Fixtures
 
+![ProtocolCanary-Fixtures](assets/ProtocolCanary-Fixtures-banner.svg)
+
+Canonical compatibility fixtures for Stellar Protocol Canary.
+
 [![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Canonical compatibility fixtures for Stellar Protocol Canary.
+[Documentation](https://stellarcanary.github.io/Protocol-Canary/) | [Protocol-Canary](https://github.com/StellarCanary/Protocol-Canary) | [Action](https://github.com/StellarCanary/ProtocolCanary-Action)
 
 ## Purpose
 
@@ -125,3 +129,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for how to add a fixture.
 See [`SECURITY.md`](SECURITY.md). In short: no secrets, no private keys, no
 executable fixture code, no transaction submission — fixture files must be
 treated as untrusted input by any consumer.
+
+## Code of Conduct
+
+See [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
