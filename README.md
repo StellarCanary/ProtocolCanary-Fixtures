@@ -77,6 +77,13 @@ makes a mixed-protocol directory safe either way.
 | [`protocol-28/`](protocol-28/) | Active | CAP-0083, CAP-0085 (XDR); Protocol 28 RPC identity; a Soroban simulation smoke fixture. See [`docs/protocol-28.md`](docs/protocol-28.md). |
 | [`protocol-27/`](protocol-27/) | Not yet populated | See [`protocol-27/README.md`](protocol-27/README.md) — fixtures are added only after their upstream behavior is independently verified, never as placeholders. |
 
+The `protocol-28/` pack has an immutable git tag,
+[`protocol-28`](https://github.com/StellarCanary/ProtocolCanary-Fixtures/releases/tag/protocol-28),
+pinned to the exact commit verified end-to-end with `Protocol-Canary`
+`v0.1.1` and `ProtocolCanary-Action` `v1`. `protocol-27/` and any future
+pack remain unpinned (consumed at `main`) until similarly verified and
+tagged.
+
 ## Fixture format
 
 Every fixture is one TOML file with common metadata plus a surface-specific
