@@ -13,14 +13,15 @@ fixture's assertion (no decoding, no network calls, no simulation) and
 never treats a fixture field as a command to run.
 
 Usage:
-    python3 tools/validate/validate.py [root ...]
+    python3 tools/validate/validate.py [-q|--quiet] [root ...]
 
-With no arguments, validates every protocol-*/ directory found next to
+With no root arguments, validates every protocol-*/ directory found next to
 this script's repository root. Exits 0 if every fixture is valid, 1
 otherwise.
 """
 from __future__ import annotations
 
+import argparse
 import base64
 import binascii
 import sys
@@ -303,8 +304,28 @@ def validate_directory(root: Path) -> Report:
     return report
 
 
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Structural validator for ProtocolCanary-Fixtures.",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="suppress warning output",
+    )
+    parser.add_argument(
+        "roots",
+        nargs="*",
+        type=Path,
+        help="one or more root directories to validate (default: protocol-*/ next to repo root)",
+    )
+    return parser.parse_args(argv)
+
+
 def main(argv: list[str]) -> int:
-    roots = [Path(a) for a in argv] if argv else None
+    args = parse_args(argv)
+    roots = args.roots or None
     if roots is None:
         repo_root = Path(__file__).resolve().parents[2]
         roots = sorted(p for p in repo_root.glob("protocol-*") if p.is_dir())
@@ -322,8 +343,9 @@ def main(argv: list[str]) -> int:
         combined.errors.extend(sub_report.errors)
         combined.warnings.extend(sub_report.warnings)
 
-    for warning in combined.warnings:
-        print(f"warning: {warning}")
+    if not args.quiet:
+        for warning in combined.warnings:
+            print(f"warning: {warning}")
     for error in combined.errors:
         print(f"error: {error}", file=sys.stderr)
 
