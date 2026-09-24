@@ -4,7 +4,9 @@ Run with: python3 -m unittest discover tests
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import sys
 import tempfile
 import unittest
@@ -161,6 +163,45 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("lowercase" in e for e in report.errors))
 
+    def test_rejects_non_table_assert_entry(self) -> None:
+        # TOML permits an array element to be a non-table value; validate_rpc_body
+        # has an explicit branch for that case. Mix a well-formed assert table
+        # with a bare string so the malformed entry is the only error reported.
+        bad = """
+id = "p28-rpc-mixed-assert"
+protocol = 28
+surface = "rpc"
+category = "network"
+description = "example"
+source_reference = "https://developers.stellar.org/docs/data/apis/rpc/api-reference/methods/getNetwork"
+
+method = "get-network"
+
+assert = [
+    { kind = "field-equals", field = "protocolVersion", value = 28 },
+    "not-a-table",
+]
+"""
+        report = self.run_validation({"a.toml": bad})
+        self.assertIn(
+            "assert[1] must be a table",
+            "\n".join(report.errors),
+        )
+        # The valid entry alongside the malformed one must not itself error.
+        self.assertFalse(any("assert[0]" in e for e in report.errors))
+
+    def test_unknown_top_level_field_is_not_an_error(self) -> None:
+        # Documents current behavior: validate.py performs no top-level
+        # additionalProperties check, so an unrecognized field (e.g. a typo'd
+        # field name) is silently accepted rather than rejected. If this ever
+        # changes, this test should fail and force a deliberate decision.
+        with_unknown = VALID_XDR.replace(
+            'source_reference = "CAP-0083"',
+            'source_reference = "CAP-0083"\nsoure_reference = "typo"',
+        )
+        report = self.run_validation({"a.toml": with_unknown})
+        self.assertEqual(report.errors, [])
+
     def test_rpc_fixture_requires_at_least_one_assert(self) -> None:
         bad = """
 id = "p28-rpc-no-assert"
@@ -205,6 +246,43 @@ method = "get-network"
         )
         report = self.run_validation({"a.toml": good})
         self.assertEqual(report.errors, [])
+
+
+class MainTests(unittest.TestCase):
+    def test_main_combines_reports_across_multiple_roots(self) -> None:
+        # main() accepts multiple roots and combines each root's Report; a
+        # failure in either root must surface in the combined result.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            good_dir = root / "good"
+            bad_dir = root / "bad"
+            write(good_dir, "a.toml", VALID_XDR)
+            write(
+                bad_dir,
+                "b.toml",
+                VALID_RPC.replace('method = "get-network"', 'method = "get-nope"'),
+            )
+            stdout, stderr = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                code = validate.main([str(good_dir), str(bad_dir)])
+
+        self.assertEqual(code, 1)
+        self.assertIn("'method'", stderr.getvalue())
+        self.assertIn("FAILED: 1 error(s)", stderr.getvalue())
+
+    def test_main_totals_files_across_multiple_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = root / "one"
+            second = root / "two"
+            write(first, "a.toml", VALID_XDR)
+            write(second, "b.toml", VALID_RPC)
+            stdout = io.StringIO()
+            with contextlib.redirect_stdout(stdout):
+                code = validate.main([str(first), str(second)])
+
+        self.assertEqual(code, 0)
+        self.assertIn("2 fixture file(s) valid across 2 root(s)", stdout.getvalue())
 
 
 if __name__ == "__main__":
