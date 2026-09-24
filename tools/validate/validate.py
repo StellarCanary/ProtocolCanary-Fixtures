@@ -33,6 +33,9 @@ XDR_TYPES = {"StellarValue", "ContractExecutable"}
 # Set of assertion kinds supported by canary-xdr for a given XDR value.
 # Must be kept in sync with canary-xdr's supported assertion kinds.
 XDR_KINDS = {"decode-success", "decode-failure", "roundtrip", "encode-equals"}
+# Set of RPC methods supported by canary-rpc. Must be kept in sync with the
+# methods canary-rpc actually implements: a value added here only names a string;
+# the corresponding method must already exist upstream in canary-rpc.
 RPC_METHODS = {"get-network", "get-latest-ledger"}
 RPC_ASSERT_KINDS = {"field-exists", "field-type", "field-equals"}
 RPC_ASSERT_TYPES = {"string", "integer", "boolean", "array", "object"}
