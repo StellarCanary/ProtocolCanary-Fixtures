@@ -175,6 +175,15 @@ method = "get-network"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("at least one" in e for e in report.errors))
 
+    def test_rejects_unrecognized_rpc_assert_kind(self) -> None:
+        bad = VALID_RPC.replace(
+            'kind = "field-equals"', 'kind = "field-contains"'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("field-contains" in e and "assert[0].kind" in e for e in report.errors)
+        )
+
     def test_soroban_fixture_requires_expect(self) -> None:
         bad = VALID_SOROBAN.replace("[expect]\nkind = \"simulation-success\"\n", "")
         report = self.run_validation({"a.toml": bad})
