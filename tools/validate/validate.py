@@ -146,7 +146,9 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
             "use a specific CAP/topic slug",
         )
 
-    _require(data, "description", str, path, report)
+    ok_description = _require(data, "description", str, path, report)
+    if ok_description and not data["description"]:
+        report.error(path, "field 'description' must not be empty")
 
     if "source_reference" in data:
         if not isinstance(data["source_reference"], str) or not data["source_reference"]:
