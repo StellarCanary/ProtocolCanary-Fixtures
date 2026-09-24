@@ -26,6 +26,16 @@ enumeration.
 | [`rpc/p28-rpc-network.toml`](rpc/p28-rpc-network.toml) | rpc | — | A configured RPC endpoint's `getNetwork` reports protocol 28 with a `passphrase` field. |
 | [`soroban/p28-soroban-native-asset-name.toml`](soroban/p28-soroban-native-asset-name.toml) | soroban | — | The full construct → `simulateTransaction` → result pipeline works against real Protocol 28 infrastructure. |
 
+> **Column legend** — *Fixture*: the fixture file, linked to its path inside
+> this pack (the fixture ID is the file's name without the `.toml`
+> extension). *Surface*: the Protocol-Canary checker the fixture targets —
+> `xdr` (decode/encode, via `canary-xdr`), `rpc` (a read-only JSON-RPC
+> call, via `canary-rpc`), or `soroban` (a simulated contract invocation,
+> via `canary-soroban`) — and matches the fixture's own `surface` field.
+> *CAP*: the Stellar Core Advancement Proposal number the fixture is
+> specific to, or `—` when it asserts general Protocol 28 behavior rather
+> than one CAP. *What it proves*: the single concrete assertion it makes.
+
 See [`../docs/protocol-28.md`](../docs/protocol-28.md) for what this pack
 checks, what it deliberately does not (including why CAP-0086 has no
 fixture yet), and source provenance for every assertion above.

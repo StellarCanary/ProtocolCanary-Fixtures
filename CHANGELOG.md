@@ -42,6 +42,12 @@ All notable changes to this project are documented in this file.
 - `protocol-27/README.md` now links its "contribution policy" reference
   directly to `CONTRIBUTING.md`, where the pack-population verification
   policy is spelled out.
+- `protocol-28/README.md`'s fixture table now carries a column legend
+  directly beneath it, defining `Fixture`, `Surface` (which of the `xdr` /
+  `rpc` / `soroban` checkers a fixture targets), `CAP` (a Stellar Core
+  Advancement Proposal number, or `—` when the fixture is not
+  CAP-specific), and `What it proves`, so a first-time reader no longer has
+  to infer the column meanings from the rows alone.
 
 ### Known gaps
 
