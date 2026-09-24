@@ -193,6 +193,14 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": "not valid [[[ toml"})
         self.assertTrue(any("invalid TOML" in e for e in report.errors))
 
+    def test_rejects_empty_description(self) -> None:
+        bad = VALID_XDR.replace(
+            'description = "example"',
+            'description = ""',
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("field 'description' must not be empty" in e for e in report.errors))
+
     def test_rejects_vague_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = "misc"')
         report = self.run_validation({"a.toml": bad})
