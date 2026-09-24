@@ -103,6 +103,30 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": VALID_XDR, "b.toml": other})
         self.assertTrue(any("duplicate fixture id" in e for e in report.errors))
 
+    def test_rejects_duplicate_ids_across_nested_directories(self) -> None:
+        # The repository stores fixtures in nested per-surface/per-CAP
+        # directories (e.g. protocol-28/xdr/cap-0083/a.toml vs.
+        # protocol-28/soroban/b.toml), so duplicate detection must recurse
+        # through the whole subtree rather than only compare files that sit
+        # directly in the root. This guards against a regression that keeps
+        # flat-directory detection working while breaking the recursive case.
+        other = VALID_XDR.replace(
+            'category = "cap-0083"', 'category = "cap-0083-2"'
+        )
+        report = self.run_validation(
+            {
+                "xdr/cap-0083/a.toml": VALID_XDR,
+                "soroban/b.toml": other,
+            }
+        )
+        duplicates = [e for e in report.errors if "duplicate fixture id" in e]
+        self.assertTrue(duplicates, report.errors)
+        # The error should point at one of the nested files, confirming the
+        # nested fixture was actually discovered by the recursive walk.
+        self.assertTrue(
+            any("soroban/b.toml" in e or "xdr/cap-0083/a.toml" in e for e in duplicates)
+        )
+
     def test_rejects_invalid_surface(self) -> None:
         bad = VALID_XDR.replace('surface = "xdr"', 'surface = "wallet"')
         report = self.run_validation({"a.toml": bad})
