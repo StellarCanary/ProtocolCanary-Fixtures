@@ -29,6 +29,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 SURFACES = {"xdr", "rpc", "soroban"}
+# Set of XDR type names supported by canary-xdr. Must be kept in sync with the
+# types canary-xdr actually supports -- an unsupported type is a Protocol-Canary
+# limitation, not something to work around here (see CONTRIBUTING.md, "If you
+# need an XDR type this repository does not yet support"): open an issue/PR
+# against canary-xdr first, and only add the type here once that support is
+# released.
 XDR_TYPES = {"StellarValue", "ContractExecutable"}
 # Set of assertion kinds supported by canary-xdr for a given XDR value.
 # Must be kept in sync with canary-xdr's supported assertion kinds.
