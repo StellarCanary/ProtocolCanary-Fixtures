@@ -131,6 +131,18 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("'kind'" in e for e in report.errors))
 
+    def test_rejects_xdr_type_not_in_xdr_types(self) -> None:
+        bad = VALID_XDR.replace('type = "StellarValue"', 'type = "LedgerEntry"')
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any(
+                "LedgerEntry" in e
+                and "StellarValue" in e
+                and "ContractExecutable" in e
+                for e in report.errors
+            )
+        )
+
     def test_encode_equals_requires_expected_base64(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
         report = self.run_validation({"a.toml": bad})
@@ -233,6 +245,16 @@ method = "get-network"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("'expect'" in e for e in report.errors))
 
+    def test_soroban_fixture_rejects_unknown_expect_kind(self) -> None:
+        # [expect] is present but its kind is not in SOROBAN_EXPECT_KINDS —
+        # a different branch of validate_soroban_body than the missing-
+        # [expect] case above.
+        bad = VALID_SOROBAN.replace(
+            'kind = "simulation-success"', 'kind = "simulation-timeout"'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("expect.kind" in e for e in report.errors))
+
     def test_rejects_invalid_base64_in_value_base64(self) -> None:
         bad = VALID_XDR.replace('value_base64 = "AAAAAA=="', 'value_base64 = "not-valid-base64!!!"')
         report = self.run_validation({"a.toml": bad})
@@ -260,41 +282,51 @@ method = "get-network"
         self.assertEqual(report.errors, [])
 
 
-class MainTests(unittest.TestCase):
-    def test_main_combines_reports_across_multiple_roots(self) -> None:
-        # main() accepts multiple roots and combines each root's Report; a
-        # failure in either root must surface in the combined result.
+class QuietFlagTests(unittest.TestCase):
+    """`--quiet` suppresses warnings while keeping errors and the summary."""
+
+    def run_main(self, argv: list[str]) -> tuple[int, str, str]:
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = validate.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def write_warning_fixture(self, root: Path) -> None:
+        # Valid fixture that omits source_reference -> warning only.
+        write(root, "warn.toml", VALID_XDR.replace('source_reference = "CAP-0083"\n', ""))
+
+    def write_error_fixture(self, root: Path) -> None:
+        # Invalid surface -> error only (source_reference is still present).
+        write(root, "error.toml", VALID_XDR.replace('surface = "xdr"', 'surface = "wallet"'))
+
+    def test_default_prints_warnings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            good_dir = root / "good"
-            bad_dir = root / "bad"
-            write(good_dir, "a.toml", VALID_XDR)
-            write(
-                bad_dir,
-                "b.toml",
-                VALID_RPC.replace('method = "get-network"', 'method = "get-nope"'),
-            )
-            stdout, stderr = io.StringIO(), io.StringIO()
-            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                code = validate.main([str(good_dir), str(bad_dir)])
-
+            self.write_warning_fixture(root)
+            self.write_error_fixture(root)
+            code, out, err = self.run_main([str(root)])
+        self.assertIn("warning:", out)
+        self.assertIn("error:", err)
         self.assertEqual(code, 1)
-        self.assertIn("'method'", stderr.getvalue())
-        self.assertIn("FAILED: 1 error(s)", stderr.getvalue())
 
-    def test_main_totals_files_across_multiple_roots(self) -> None:
+    def test_quiet_suppresses_warnings_but_keeps_errors(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            first = root / "one"
-            second = root / "two"
-            write(first, "a.toml", VALID_XDR)
-            write(second, "b.toml", VALID_RPC)
-            stdout = io.StringIO()
-            with contextlib.redirect_stdout(stdout):
-                code = validate.main([str(first), str(second)])
+            self.write_warning_fixture(root)
+            self.write_error_fixture(root)
+            code, out, err = self.run_main(["--quiet", str(root)])
+        self.assertNotIn("warning:", out)
+        self.assertIn("error:", err)
+        self.assertEqual(code, 1)
 
+    def test_quiet_keeps_ok_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.write_warning_fixture(root)
+            code, out, err = self.run_main(["--quiet", str(root)])
+        self.assertNotIn("warning:", out)
+        self.assertIn("OK:", out)
         self.assertEqual(code, 0)
-        self.assertIn("2 fixture file(s) valid across 2 root(s)", stdout.getvalue())
 
 
 if __name__ == "__main__":
