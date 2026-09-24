@@ -22,10 +22,10 @@ To add one:
 - **Write it** — stable, repository-unique `p<protocol>-<surface>-<slug>` ID;
   deterministic input; an explicit expected result using the surface's typed
   assertion vocabulary.
-- **Check it** — run `python3 tools/validate/validate.py`.
+- **Check it** — run `make validate` (or `python3 tools/validate/validate.py` directly).
 - **Document & test it** — update the relevant `docs/protocol-NN.md` table
   (and the pack's `README.md` for a new CAP or surface), then run
-  `python3 -m unittest discover tests`.
+  `make test` (or `python3 -m unittest discover tests` directly).
 
 1. **Identify the upstream behavior.** Read the CAP text, the upstream XDR
    definition, the upstream implementation, or the official release/API
@@ -52,10 +52,15 @@ To add one:
 5. **Define an explicit expected result** using the assertion vocabulary
    the target surface actually supports (see "Fixture schema" below) — no
    generic string matching when a typed assertion exists.
-6. **Validate the fixture**: `python3 tools/validate/validate.py`.
+6. **Validate the fixture**: `make validate` — or
+   `python3 tools/validate/validate.py` directly.
 7. **Add/update documentation**: the relevant `docs/protocol-NN.md` table
    and, if you added a new CAP or surface, the pack's `README.md`.
-8. **Run the repository tests**: `python3 -m unittest discover tests`.
+8. **Run the repository tests**: `make test` — or
+   `python3 -m unittest discover tests` directly.
+
+Before pushing, `make check` runs both of the above in one command, in
+the same order CI (`.github/workflows/validate.yml`) runs them.
 
 > **Note**: Do not add a `manifest.toml` or similar discovery/enumeration file. The loader recursively treats every `*.toml` file under `--fixtures-dir` as a fixture, so a manifest `.toml` file would be mis-parsed as a malformed fixture and fail the run (see [README.md](README.md#repository-relationship)).
 
@@ -152,3 +157,12 @@ it in a later, separate change once nothing depends on it.
 
 No build system is required. `tools/validate/validate.py` uses only the
 Python 3.11+ standard library (`tomllib`), so there is nothing to install.
+
+For convenience, a `Makefile` wraps the two commands CI runs:
+
+- `make validate` — structural fixture validation.
+- `make test` — the repository test suite.
+- `make check` — both, in CI's order, stopping at the first failure.
+
+The underlying commands work identically if run directly, so `make` is
+not a requirement for contributing — it only saves typing.
