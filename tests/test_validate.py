@@ -76,6 +76,21 @@ def write(dir_path: Path, name: str, contents: str) -> Path:
     return path
 
 
+def run_main(argv: list[str]) -> tuple[int, str, str]:
+    """Invoke ``validate.main`` capturing its (stdout, stderr).
+
+    ``main`` is the actual entry point CI runs (``python3
+    tools/validate/validate.py``): it parses argv, prints its report to
+    stdout/stderr and returns an exit code. It does not return its
+    ``Report``, so tests exercise it the way CI does rather than only
+    through the lower-level ``validate_directory`` helper.
+    """
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        exit_code = validate.main(argv)
+    return exit_code, stdout.getvalue(), stderr.getvalue()
+
+
 class ValidatorTests(unittest.TestCase):
     def run_validation(self, files: dict[str, str]) -> "validate.Report":
         with tempfile.TemporaryDirectory() as tmp:
@@ -242,15 +257,50 @@ method = "get-network"
         report = self.run_validation({"a.toml": good})
         self.assertEqual(report.errors, [])
 
+    def test_main_returns_1_when_a_root_does_not_exist(self) -> None:
+        # main()'s own root-existence check, exercised through its argv path.
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = Path(tmp) / "does-not-exist"
+            exit_code, _stdout, stderr = run_main([str(missing)])
+
+        self.assertFalse(missing.exists())
+        self.assertEqual(exit_code, 1)
+        self.assertIn(str(missing), stderr)
+        self.assertIn("not a directory", stderr)
+        self.assertIn("FAILED: 1 error(s)", stderr)
+
+    def test_main_accepts_an_explicit_root_argument(self) -> None:
+        # Covers main()'s argv-parsing path for the success case too.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "a.toml", VALID_XDR)
+            exit_code, stdout, stderr = run_main([str(root)])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr, "")
+        self.assertIn("OK: 1 fixture file(s) valid across 1 root(s)", stdout)
+
+    def test_main_aggregates_errors_across_multiple_roots(self) -> None:
+        # A missing root must not stop main() from validating the roots that
+        # do exist; both errors are aggregated and the exit code is still 1.
+        with tempfile.TemporaryDirectory() as tmp:
+            pack = Path(tmp) / "pack"
+            write(
+                pack,
+                "a.toml",
+                VALID_XDR.replace('category = "cap-0083"', 'category = "misc"'),
+            )
+            missing = Path(tmp) / "does-not-exist"
+            exit_code, _stdout, stderr = run_main([str(pack), str(missing)])
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("too vague", stderr)
+        self.assertIn("not a directory", stderr)
+        self.assertIn("FAILED: 2 error(s)", stderr)
+
 
 class QuietFlagTests(unittest.TestCase):
     """`--quiet` suppresses warnings while keeping errors and the summary."""
-
-    def run_main(self, argv: list[str]) -> tuple[int, str, str]:
-        out, err = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-            code = validate.main(argv)
-        return code, out.getvalue(), err.getvalue()
 
     def write_warning_fixture(self, root: Path) -> None:
         # Valid fixture that omits source_reference -> warning only.
@@ -265,7 +315,7 @@ class QuietFlagTests(unittest.TestCase):
             root = Path(tmp)
             self.write_warning_fixture(root)
             self.write_error_fixture(root)
-            code, out, err = self.run_main([str(root)])
+            code, out, err = run_main([str(root)])
         self.assertIn("warning:", out)
         self.assertIn("error:", err)
         self.assertEqual(code, 1)
@@ -275,7 +325,7 @@ class QuietFlagTests(unittest.TestCase):
             root = Path(tmp)
             self.write_warning_fixture(root)
             self.write_error_fixture(root)
-            code, out, err = self.run_main(["--quiet", str(root)])
+            code, out, err = run_main(["--quiet", str(root)])
         self.assertNotIn("warning:", out)
         self.assertIn("error:", err)
         self.assertEqual(code, 1)
@@ -284,7 +334,7 @@ class QuietFlagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.write_warning_fixture(root)
-            code, out, err = self.run_main(["--quiet", str(root)])
+            code, out, err = run_main(["--quiet", str(root)])
         self.assertNotIn("warning:", out)
         self.assertIn("OK:", out)
         self.assertEqual(code, 0)
