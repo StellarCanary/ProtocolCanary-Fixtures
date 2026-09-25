@@ -98,9 +98,16 @@ resolve, fetch, and invoke existing external references, but
 selecting the executable; it has no direct external-reference deployment
 option. The v28.0.0
 [CAP-0085 integration test](https://github.com/stellar/stellar-cli/blob/v28.0.0/cmd/crates/soroban-test/tests/it/integration/contract/external_ref.rs)
-demonstrates the owner-side `publish` and `deploy_ref` methods, but that
-requires a separately deployed owner contract and is not a general CLI
-construction path. The open draft [`stellar-cli` PR #2659](https://github.com/stellar/stellar-cli/pull/2659)
+demonstrates the owner-side flow with commands equivalent to:
+
+```text
+stellar contract invoke --id <OWNER_ID> -- publish --tag fleet --wasm-hash <WASM_HASH>
+stellar contract invoke --id <OWNER_ID> -- deploy_ref --tag fleet
+```
+
+(the test supplies the configured source account and network). This requires a
+separately deployed owner contract and is not a general CLI construction path.
+The open draft [`stellar-cli` PR #2659](https://github.com/stellar/stellar-cli/pull/2659)
 proposes `--executable-owner` and `--executable-tag`; until that support is
 released, adding a live fixture would require hand-crafting raw
 `InvokeHostFunction`/ledger-entry operations directly against the XDR, which
