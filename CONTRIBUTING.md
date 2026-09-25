@@ -158,6 +158,10 @@ misspelled duplicate first. Tightening this (rejecting unknown fields) would be
 a deliberate change requiring a matching update to the test that documents the
 current behavior in `tests/test_validate.py` — never an accidental side effect.
 
+### Protocol version bounds
+
+The `protocol` field requires a positive integer (`protocol >= 1`), but its range is **intentionally unbounded above** in `tools/validate/validate.py`. This avoids having to update the validator every time a new Stellar protocol version ships. Stray or typo'd protocol numbers (e.g. `82` instead of `28`) are expected to be caught by pack-level tests (such as `test_every_fixture_targets_protocol_28`) rather than by a hardcoded maximum in the validator.
+
 If you need an XDR `type` this repository does not yet support, that is a
 `Protocol-Canary` limitation, not something to work around here — open an
 issue/PR against `Protocol-Canary`'s `canary-xdr` crate first (see its own
