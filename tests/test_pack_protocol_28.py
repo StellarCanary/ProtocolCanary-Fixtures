@@ -59,6 +59,11 @@ class Protocol28PackTests(unittest.TestCase):
         for fx in self.fixtures:
             self.assertTrue(fx.data.get("source_reference"), fx.path)
 
+    def test_fixture_ids_follow_protocol_surface_convention(self) -> None:
+        for fx in self.fixtures:
+            expected_prefix = f"p{fx.data['protocol']}-{fx.data['surface']}-"
+            self.assertTrue(str(fx.data.get("id", "")).startswith(expected_prefix), fx.path)
+
     def test_expected_fixture_ids_are_present_per_surface(self) -> None:
         by_surface: dict[str, set[str]] = {"xdr": set(), "rpc": set(), "soroban": set()}
         for fx in self.fixtures:
