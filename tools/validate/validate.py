@@ -126,6 +126,9 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
         report.error(path, "field 'id' must be lowercase")
 
     ok_protocol = _require(data, "protocol", int, path, report)
+    # The protocol range is intentionally unbounded above to avoid maintaining
+    # a hardcoded version list that drifts with each Stellar release. Stray or
+    # typo'd protocol numbers are expected to be caught by pack-level tests instead.
     if ok_protocol and data["protocol"] < 1:
         report.error(path, "field 'protocol' must be a positive integer")
 
