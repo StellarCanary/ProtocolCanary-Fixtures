@@ -157,6 +157,10 @@ misspelled duplicate first. Tightening this (rejecting unknown fields) would be
 a deliberate change requiring a matching update to the test that documents the
 current behavior in `tests/test_validate.py` — never an accidental side effect.
 
+### Protocol filtering behavior
+
+The `protocol` field specifies the Stellar protocol version targeted by the fixture. In accordance with [`schemas/fixture-v1.schema.json`](schemas/fixture-v1.schema.json) (which notes that *"A run whose `--protocol` does not match is skipped, not failed"*), runners filtering fixtures via `--protocol <version>` silently skip fixtures targeting other protocol versions rather than failing the run. When this repository contains fixtures across multiple protocol packs (e.g. `protocol-27/` and `protocol-28/`), executing a run with `--protocol` filtering skips fixtures for other versions by design; this skip-not-fail behavior is normal and should not be misconstrued as a validation failure.
+
 If you need an XDR `type` this repository does not yet support, that is a
 `Protocol-Canary` limitation, not something to work around here — open an
 issue/PR against `Protocol-Canary`'s `canary-xdr` crate first (see its own
