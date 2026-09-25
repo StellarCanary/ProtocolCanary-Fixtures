@@ -79,7 +79,17 @@ discussion and diff. New entries must include that link; see
   The XDR fixtures above prove the wire representation round-trips; they
   do not exercise an actual deployed externally-managed-executable
   contract fleet end-to-end, which would require deploying and verifying a
-  real Protocol 28 contract using this brand-new executable type.
+  real Protocol 28 contract using this brand-new executable type. The Rust
+  `stellar` CLI **27.1.0** installed while authoring this pack had no
+  supported external-reference deployment flow. The current **28.0.0**
+  release can resolve and invoke existing external references, but its
+  `stellar contract deploy` command still has no direct
+  `--executable-owner`/`--executable-tag` construction option; the draft
+  [`stellar-cli` PR #2659](https://github.com/stellar/stellar-cli/pull/2659)
+  is the upstream candidate to unblock that gap. The exact commands,
+  re-check date, and distinction between reference resolution and direct
+  deployment are recorded in [`docs/protocol-28.md`](docs/protocol-28.md) and
+  tracked by [issue #8](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/8).
   ([757e1e7])
 - `protocol-27/` is intentionally empty; see `protocol-27/README.md`.
   ([757e1e7])
