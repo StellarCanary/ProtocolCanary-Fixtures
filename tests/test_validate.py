@@ -685,49 +685,6 @@ class QuietFlagTests(unittest.TestCase):
         self.assertEqual(code, 0)
 
 
-class ValidatorCliTests(unittest.TestCase):
-    def test_main_default_prints_warnings(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            fixture_toml = VALID_XDR.replace('source_reference = "CAP-0083"\n', "")
-            write(root, "warning_fixture.toml", fixture_toml)
-            stdout = io.StringIO()
-            stderr = io.StringIO()
-            with redirect_stdout(stdout), redirect_stderr(stderr):
-                exit_code = validate.main([str(root)])
-            self.assertEqual(exit_code, 0)
-            self.assertIn("warning:", stdout.getvalue())
-            self.assertIn("OK: 1 fixture file(s) valid", stdout.getvalue())
-
-    def test_main_quiet_flag_suppresses_warnings(self) -> None:
-        for flag in ["--quiet", "-q"]:
-            with self.subTest(flag=flag):
-                with tempfile.TemporaryDirectory() as tmp:
-                    root = Path(tmp)
-                    fixture_toml = VALID_XDR.replace('source_reference = "CAP-0083"\n', "")
-                    write(root, "warning_fixture.toml", fixture_toml)
-                    stdout = io.StringIO()
-                    stderr = io.StringIO()
-                    with redirect_stdout(stdout), redirect_stderr(stderr):
-                        exit_code = validate.main([flag, str(root)])
-                    self.assertEqual(exit_code, 0)
-                    self.assertNotIn("warning:", stdout.getvalue())
-                    self.assertIn("OK: 1 fixture file(s) valid", stdout.getvalue())
-
-    def test_main_quiet_flag_still_prints_errors(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            bad_fixture = VALID_XDR.replace('surface = "xdr"', 'surface = "unknown"')
-            write(root, "bad_fixture.toml", bad_fixture)
-            stdout = io.StringIO()
-            stderr = io.StringIO()
-            with redirect_stdout(stdout), redirect_stderr(stderr):
-                exit_code = validate.main(["--quiet", str(root)])
-            self.assertEqual(exit_code, 1)
-            self.assertIn("error:", stderr.getvalue())
-            self.assertIn("FAILED: 1 error(s)", stderr.getvalue())
-
-
 if __name__ == "__main__":
     unittest.main()
 

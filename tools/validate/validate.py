@@ -365,9 +365,6 @@ def validate_directory(root: Path) -> Report:
     return report
 
 
-def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Structural validator for ProtocolCanary-Fixtures.",
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="validate.py",
@@ -389,20 +386,6 @@ def build_parser() -> argparse.ArgumentParser:
         "-q",
         "--quiet",
         action="store_true",
-        help="suppress warning output",
-    )
-    parser.add_argument(
-        "roots",
-        nargs="*",
-        type=Path,
-        help="one or more root directories to validate (default: protocol-*/ next to repo root)",
-    )
-    return parser.parse_args(argv)
-
-
-def main(argv: list[str]) -> int:
-    args = parse_args(argv)
-    roots = args.roots or None
         help=(
             "suppress warning output; errors and the final OK/FAILED summary are "
             "still printed"
