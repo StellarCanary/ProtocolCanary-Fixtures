@@ -87,17 +87,15 @@ host-function behavior from an authoritative source, **stop** — do not
 guess a byte sequence or invent an undocumented host function because it
 "looks right". Open an issue describing the gap instead.
 
-## Recording verification dates
+### Reviewing a source reference
 
-When a fixture's header comment records when a live-network observation was
-made (for example, the date an RPC endpoint or a simulation was last checked
-to still return the documented result), write the date as **`YYYY-MM-DD` in
-UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
-appears in a header comment (or otherwise make clear it is UTC).
+The "no-fabrication" policy is only as strong as the review step that enforces it. `validate.py` only checks that a `source_reference` field is present and non-empty. It is the reviewer's responsibility to confirm the cited source actually supports the specific value asserted before approving a PR.
 
-Rationale: these dates exist so a future reader can judge how stale an
-observation may be. Recording them in local time would make a date recorded
-near a day boundary ambiguous by up to a day, defeating that purpose.
+When reviewing a fixture, you must:
+1. **Verify the text:** Open the cited CAP text, upstream XDR definition, or API reference, and confirm it explicitly documents the exact field, discriminant, or wire representation the fixture asserts (not just that the linked URL exists).
+2. **Verify the execution:** If the fixture's header comment explains that the expected value was derived by running a specific crate call or CLI command, re-run that exact call locally and diff the output to confirm it matches the fixture.
+
+A plausible-looking but unverified `source_reference` must not pass review.
 
 ## Fixture schema
 
