@@ -44,7 +44,7 @@ XDR_TYPES = {"StellarValue", "ContractExecutable"}
 # Must be kept in sync with canary-xdr's supported assertion kinds.
 XDR_KINDS = {"decode-success", "decode-failure", "roundtrip", "encode-equals"}
 RPC_METHODS = {"get-network", "get-latest-ledger"}
-RPC_ASSERT_KINDS = {"field-exists", "field-type", "field-equals"}
+RPC_ASSERT_KINDS = {"field-exists", "field-absent", "field-type", "field-equals"}
 # JSON type names accepted for RPC field-type assertions. Keep this set in
 # sync with the `expected_type` enum in schemas/fixture-v1.schema.json.
 RPC_ASSERT_TYPES = {"string", "integer", "boolean", "array", "object"}

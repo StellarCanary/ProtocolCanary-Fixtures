@@ -119,7 +119,7 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["field-exists", "field-type", "field-equals"]
+                  "enum": ["field-exists", "field-absent", "field-type", "field-equals"]
                 },
                 "field": { "type": "string", "minLength": 1 },
                 "value": {},

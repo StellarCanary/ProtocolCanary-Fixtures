@@ -309,6 +309,15 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": "not valid [[[ toml"})
         self.assertTrue(any("invalid TOML" in e for e in report.errors))
 
+    def test_load_fixture_handles_unreadable_file_oserror(self) -> None:
+        report = validate.Report()
+        path = Path("unreadable.toml")
+        with mock.patch.object(Path, "read_text", side_effect=OSError("Permission denied")):
+            result = validate.load_fixture(path, report)
+        self.assertIsNone(result)
+        self.assertEqual(len(report.errors), 1)
+        self.assertIn("failed to read file: Permission denied", report.errors[0])
+
     def test_rejects_empty_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
         report = self.run_validation({"a.toml": bad})
@@ -463,8 +472,17 @@ expected_type = "not-a-real-type"
         # validator does accept, so that neither widening nor narrowing
         # RPC_ASSERT_KINDS can pass unnoticed.
         self.assertIn("field-contains", errors[0])
-        for supported in ("field-exists", "field-type", "field-equals"):
+        for supported in ("field-exists", "field-absent", "field-type", "field-equals"):
             self.assertIn(supported, errors[0])
+
+    def test_accepts_rpc_fixture_with_field_absent(self) -> None:
+        fixture = RPC_HEADER + """
+[[assert]]
+kind = "field-absent"
+field = "error"
+"""
+        report = self.run_validation({"a.toml": fixture})
+        self.assertEqual(report.errors, [])
 
     def test_soroban_fixture_requires_expect(self) -> None:
         bad = VALID_SOROBAN.replace("[expect]\nkind = \"simulation-success\"\n", "")
