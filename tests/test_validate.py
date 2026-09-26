@@ -213,6 +213,20 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("does not resolve to an existing file" in e for e in report.errors))
 
+    def test_rejects_empty_input_file(self) -> None:
+        bad = VALID_XDR + '\ninput_file = ""\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("field 'input_file', if present, must be a non-empty string" in e for e in report.errors)
+        )
+
+    def test_rejects_non_string_expected_file(self) -> None:
+        bad = VALID_XDR + '\nexpected_file = 123\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("field 'expected_file', if present, must be a non-empty string" in e for e in report.errors)
+        )
+
     def test_accepts_an_existing_input_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -282,10 +296,22 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": "not valid [[[ toml"})
         self.assertTrue(any("invalid TOML" in e for e in report.errors))
 
+    def test_rejects_empty_category(self) -> None:
+        bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("must not be empty" in e and "'category'" in e for e in report.errors))
+
     def test_rejects_vague_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = "misc"')
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("too vague" in e for e in report.errors))
+
+    def test_rejects_empty_id(self) -> None:
+        bad = VALID_XDR.replace(
+            'id = "p28-xdr-cap83-example"', 'id = ""'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("must not be empty" in e and "'id'" in e for e in report.errors))
 
     def test_rejects_uppercase_id(self) -> None:
         bad = VALID_XDR.replace(
@@ -293,6 +319,13 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("lowercase" in e for e in report.errors))
+
+    def test_rejects_empty_id(self) -> None:
+        bad = VALID_XDR.replace(
+            'id = "p28-xdr-cap83-example"', 'id = ""'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("field 'id' must not be empty" in e for e in report.errors))
 
     def test_rejects_non_table_assert_entry(self) -> None:
         # TOML permits an array element to be a non-table value; validate_rpc_body
@@ -526,6 +559,14 @@ expected_type = "not-a-real-type"
             report.errors,
         )
 
+    def test_soroban_fixture_rejects_non_table_expect(self) -> None:
+        bad = VALID_SOROBAN.replace(
+            "[expect]\nkind = \"simulation-success\"\n",
+            'expect = "simulation-success"\n',
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("'expect' must be a table" in e for e in report.errors))
+
     def test_rejects_invalid_base64_in_value_base64(self) -> None:
         bad = VALID_XDR.replace('value_base64 = "AAAAAA=="', 'value_base64 = "not-valid-base64!!!"')
         report = self.run_validation({"a.toml": bad})
@@ -551,6 +592,20 @@ expected_type = "not-a-real-type"
         )
         report = self.run_validation({"a.toml": good})
         self.assertEqual(report.errors, [])
+
+    def test_main_autodiscovers_protocol_directories_when_no_arguments_passed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", VALID_XDR)
+            write(root, "not-a-protocol/other.toml", "invalid toml [[[")
+            fake_file = str(root / "tools" / "validate" / "validate.py")
+            out, err = io.StringIO(), io.StringIO()
+            with mock.patch.object(validate, "__file__", fake_file):
+                with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                    code = validate.main([])
+            self.assertEqual(code, 0)
+            self.assertEqual(err.getvalue(), "")
+            self.assertIn("1 fixture file(s) valid across 1 root(s)", out.getvalue())
 
 
 class QuietFlagTests(unittest.TestCase):
