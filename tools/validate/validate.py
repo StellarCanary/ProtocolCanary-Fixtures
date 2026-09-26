@@ -47,7 +47,7 @@ RPC_METHODS = {"get-network", "get-latest-ledger"}
 RPC_ASSERT_KINDS = {"field-exists", "field-absent", "field-type", "field-equals"}
 # JSON type names accepted for RPC field-type assertions. Keep this set in
 # sync with the `expected_type` enum in schemas/fixture-v1.schema.json.
-RPC_ASSERT_TYPES = {"string", "integer", "boolean", "array", "object"}
+RPC_ASSERT_TYPES = {"string", "number", "bool", "object", "array", "null"}
 SOROBAN_EXPECT_KINDS = {"simulation-success", "simulation-error"}
 # Set of kebab-case capability strings a fixture may list in
 # `required_capabilities`. Must be kept in sync with
