@@ -306,6 +306,10 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("too vague" in e for e in report.errors))
 
+    def test_rejects_missing_description(self) -> None:
+        bad = VALID_XDR.replace('description = "example"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("description" in e for e in report.errors))
     def test_rejects_empty_id(self) -> None:
         bad = VALID_XDR.replace(
             'id = "p28-xdr-cap83-example"', 'id = ""'
