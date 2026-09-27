@@ -251,10 +251,14 @@ def validate_xdr_body(fx: Fixture, report: Report) -> None:
         )
 
     if _require(data, "value_base64", str, path, report):
+        if not data["value_base64"]:
+            report.error(path, "field 'value_base64' must not be empty")
         _validate_base64(data["value_base64"], "value_base64", path, report)
 
     if (ok_kind and data["kind"] == "encode-equals") or "expected_base64" in data:
         if _require(data, "expected_base64", str, path, report):
+            if not data["expected_base64"]:
+                report.error(path, "field 'expected_base64' must not be empty")
             _validate_base64(data["expected_base64"], "expected_base64", path, report)
 
 
@@ -301,9 +305,12 @@ def validate_rpc_body(fx: Fixture, report: Report) -> None:
 def validate_soroban_body(fx: Fixture, report: Report) -> None:
     data, path = fx.data, fx.path
 
-    _require(data, "source_account", str, path, report)
-    _require(data, "contract_id", str, path, report)
-    _require(data, "function", str, path, report)
+    if _require(data, "source_account", str, path, report) and not data["source_account"]:
+        report.error(path, "field 'source_account' must not be empty")
+    if _require(data, "contract_id", str, path, report) and not data["contract_id"]:
+        report.error(path, "field 'contract_id' must not be empty")
+    if _require(data, "function", str, path, report) and not data["function"]:
+        report.error(path, "field 'function' must not be empty")
     _require(data, "sequence_number", int, path, report)
 
     # 'args' is optional but, when present, must match the schema's

@@ -147,8 +147,12 @@ class ValidatorTests(unittest.TestCase):
         self.assertTrue(duplicates, report.errors)
         # The error should point at one of the nested files, confirming the
         # nested fixture was actually discovered by the recursive walk.
+        nested_paths = (
+            str(Path("soroban") / "b.toml"),
+            str(Path("xdr") / "cap-0083" / "a.toml"),
+        )
         self.assertTrue(
-            any("soroban/b.toml" in e or "xdr/cap-0083/a.toml" in e for e in duplicates)
+            any(nested_path in error for nested_path in nested_paths for error in duplicates)
         )
 
     def test_rejects_invalid_surface(self) -> None:
@@ -269,6 +273,31 @@ class ValidatorTests(unittest.TestCase):
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("expected_base64" in e for e in report.errors))
+
+    def test_rejects_empty_min_length_fields(self) -> None:
+        cases = {
+            "value_base64": VALID_XDR.replace('value_base64 = "AAAAAA=="', 'value_base64 = ""'),
+            "expected_base64": (
+                VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
+                + 'expected_base64 = ""\n'
+            ),
+            "source_account": VALID_SOROBAN.replace(
+                'source_account = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"',
+                'source_account = ""',
+            ),
+            "contract_id": VALID_SOROBAN.replace(
+                'contract_id = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"',
+                'contract_id = ""',
+            ),
+            "function": VALID_SOROBAN.replace('function = "name"', 'function = ""'),
+        }
+        for field, fixture in cases.items():
+            with self.subTest(field=field):
+                report = self.run_validation({"a.toml": fixture})
+                self.assertTrue(
+                    any(f"field '{field}' must not be empty" in error for error in report.errors),
+                    report.errors,
+                )
 
     def test_rejects_empty_source_reference(self) -> None:
         bad = VALID_XDR.replace('source_reference = "CAP-0083"', 'source_reference = ""')
