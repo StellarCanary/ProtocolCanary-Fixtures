@@ -52,8 +52,11 @@ SOROBAN_EXPECT_KINDS = {"simulation-success", "simulation-error"}
 # Set of kebab-case capability strings a fixture may list in
 # `required_capabilities`. Must be kept in sync with
 # canary_core::Capability in StellarCanary/Protocol-Canary, whose
-# kebab-case names these mirror (the same cross-reference is documented in
-# schemas/fixture-v1.schema.json's required_capabilities description).
+# kebab-case names these mirror, AND with the required_capabilities
+# enum in schemas/fixture-v1.schema.json (the same cross-reference is
+# documented there). The two lists are maintained independently (a
+# Python set and a JSON Schema enum), so adding a value to one without
+# the other silently creates a validator/schema mismatch.
 CAPABILITIES = {
     "soroban-contract",
     "rpc-client",

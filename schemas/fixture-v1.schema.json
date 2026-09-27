@@ -62,7 +62,7 @@
           "raw-ledger-access"
         ]
       },
-      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed."
+      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed. This enum must be kept in sync with CAPABILITIES in tools/validate/validate.py and with canary_core::Capability in StellarCanary/Protocol-Canary; the two lists are maintained independently (a JSON Schema enum and a Python set), so a new capability added to one without the other silently creates a validator/schema mismatch."
     },
     "input_file": {
       "type": "string",
