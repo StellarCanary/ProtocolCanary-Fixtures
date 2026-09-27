@@ -107,6 +107,19 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": VALID_SOROBAN})
         self.assertEqual(report.errors, [])
 
+    def test_discovers_fixtures_in_nested_subdirectories(self) -> None:
+        files = {
+            "flat.toml": VALID_XDR,
+            "xdr/cap-0083/nested.toml": VALID_RPC,
+            "xdr/cap-0085/deeper/deepest.toml": VALID_SOROBAN,
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            written = {write(root, name, contents) for name, contents in files.items()}
+            self.assertEqual(set(validate.find_fixture_files(root)), written)
+            report = validate.validate_directory(root)
+        self.assertEqual(report.errors, [])
+
     def test_rejects_duplicate_ids(self) -> None:
         other = VALID_XDR.replace(
             'category = "cap-0083"', 'category = "cap-0083-2"'
@@ -134,8 +147,12 @@ class ValidatorTests(unittest.TestCase):
         self.assertTrue(duplicates, report.errors)
         # The error should point at one of the nested files, confirming the
         # nested fixture was actually discovered by the recursive walk.
+        nested_paths = (
+            str(Path("soroban") / "b.toml"),
+            str(Path("xdr") / "cap-0083" / "a.toml"),
+        )
         self.assertTrue(
-            any("soroban/b.toml" in e or "xdr/cap-0083/a.toml" in e for e in duplicates)
+            any(nested_path in error for nested_path in nested_paths for error in duplicates)
         )
 
     def test_rejects_invalid_surface(self) -> None:
@@ -257,6 +274,31 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("expected_base64" in e for e in report.errors))
 
+    def test_rejects_empty_min_length_fields(self) -> None:
+        cases = {
+            "value_base64": VALID_XDR.replace('value_base64 = "AAAAAA=="', 'value_base64 = ""'),
+            "expected_base64": (
+                VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
+                + 'expected_base64 = ""\n'
+            ),
+            "source_account": VALID_SOROBAN.replace(
+                'source_account = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"',
+                'source_account = ""',
+            ),
+            "contract_id": VALID_SOROBAN.replace(
+                'contract_id = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC"',
+                'contract_id = ""',
+            ),
+            "function": VALID_SOROBAN.replace('function = "name"', 'function = ""'),
+        }
+        for field, fixture in cases.items():
+            with self.subTest(field=field):
+                report = self.run_validation({"a.toml": fixture})
+                self.assertTrue(
+                    any(f"field '{field}' must not be empty" in error for error in report.errors),
+                    report.errors,
+                )
+
     def test_rejects_empty_source_reference(self) -> None:
         bad = VALID_XDR.replace('source_reference = "CAP-0083"', 'source_reference = ""')
         report = self.run_validation({"a.toml": bad})
@@ -295,6 +337,15 @@ class ValidatorTests(unittest.TestCase):
     def test_rejects_malformed_toml(self) -> None:
         report = self.run_validation({"a.toml": "not valid [[[ toml"})
         self.assertTrue(any("invalid TOML" in e for e in report.errors))
+
+    def test_load_fixture_handles_unreadable_file_oserror(self) -> None:
+        report = validate.Report()
+        path = Path("unreadable.toml")
+        with mock.patch.object(Path, "read_text", side_effect=OSError("Permission denied")):
+            result = validate.load_fixture(path, report)
+        self.assertIsNone(result)
+        self.assertEqual(len(report.errors), 1)
+        self.assertIn("failed to read file: Permission denied", report.errors[0])
 
     def test_rejects_empty_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
@@ -454,14 +505,45 @@ expected_type = "not-a-real-type"
         # validator does accept, so that neither widening nor narrowing
         # RPC_ASSERT_KINDS can pass unnoticed.
         self.assertIn("field-contains", errors[0])
-        for supported in ("field-exists", "field-type", "field-equals"):
+        for supported in ("field-exists", "field-absent", "field-type", "field-equals"):
             self.assertIn(supported, errors[0])
+
+    def test_accepts_rpc_fixture_with_field_absent(self) -> None:
+        fixture = RPC_HEADER + """
+[[assert]]
+kind = "field-absent"
+field = "error"
+"""
+        report = self.run_validation({"a.toml": fixture})
+        self.assertEqual(report.errors, [])
 
     def test_soroban_fixture_requires_expect(self) -> None:
         bad = VALID_SOROBAN.replace("[expect]\nkind = \"simulation-success\"\n", "")
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("'expect'" in e for e in report.errors))
 
+    def test_rejects_non_array_args(self) -> None:
+        # schemas/fixture-v1.schema.json declares soroban "args" as
+        # { "type": "array" }; a non-array value must be reported here too.
+        for literal in ('"not-an-array"', "5"):
+            with self.subTest(args=literal):
+                bad = VALID_SOROBAN.replace(
+                    "sequence_number = 1",
+                    f"sequence_number = 1\nargs = {literal}",
+                )
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(
+                    any("'args'" in e and "array" in e for e in report.errors),
+                    f"expected an 'args' array error for args = {literal}, "
+                    f"got: {report.errors}",
+                )
+
+    def test_accepts_array_args(self) -> None:
+        good = VALID_SOROBAN.replace(
+            "sequence_number = 1", 'sequence_number = 1\nargs = ["name"]'
+        )
+        report = self.run_validation({"a.toml": good})
+        self.assertEqual(report.errors, [])
     def test_soroban_fixture_rejects_unknown_expect_kind(self) -> None:
         # [expect] is present but its kind is not in SOROBAN_EXPECT_KINDS —
         # a different branch of validate_soroban_body than the missing-

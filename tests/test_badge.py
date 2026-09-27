@@ -4,11 +4,14 @@ Run with: python3 -m unittest discover tests
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BADGE_PATH = REPO_ROOT / "tools" / "badge" / "badge.py"
@@ -107,6 +110,76 @@ class BadgeTests(unittest.TestCase):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn(badge.BADGE_START, readme)
         self.assertIn(badge.BADGE_END, readme)
+
+
+class BadgeMainTests(unittest.TestCase):
+    def run_main(
+        self, root: Path, argv: list[str]
+    ) -> tuple[int, str, str]:
+        readme_path = root / "README.md"
+        out, err = io.StringIO(), io.StringIO()
+        with mock.patch.object(badge, "README_PATH", readme_path), mock.patch.object(
+            badge, "REPO_ROOT", root
+        ):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = badge.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def test_main_check_passes_when_badge_is_current(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "README.md", marked_readme(1))
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", FIXTURE)
+            code, out, err = self.run_main(root, ["--check"])
+            self.assertEqual(code, 0)
+            self.assertIn("OK: README.md fixtures badge is current (1 fixture file(s))", out)
+            self.assertEqual(err, "")
+
+    def test_main_check_fails_when_badge_is_stale(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "README.md", marked_readme(99))
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", FIXTURE)
+            code, out, err = self.run_main(root, ["--check"])
+            self.assertEqual(code, 1)
+            self.assertIn("error: README.md's fixtures badge is stale", err)
+
+    def test_main_updates_stale_readme_when_not_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme_file = write(root, "README.md", marked_readme(99))
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", FIXTURE)
+            code, out, err = self.run_main(root, [])
+            self.assertEqual(code, 0)
+            self.assertIn("OK: README.md fixtures badge updated to 1 fixture file(s)", out)
+            self.assertEqual(err, "")
+            self.assertEqual(readme_file.read_text(encoding="utf-8"), marked_readme(1))
+
+    def test_main_already_current_when_not_check(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "README.md", marked_readme(1))
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", FIXTURE)
+            code, out, err = self.run_main(root, [])
+            self.assertEqual(code, 0)
+            self.assertIn("OK: README.md fixtures badge already current (1 fixture file(s))", out)
+            self.assertEqual(err, "")
+
+    def test_main_handles_missing_markers_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "README.md", "# No markers here\n")
+            code, out, err = self.run_main(root, [])
+            self.assertEqual(code, 1)
+            self.assertIn("error:", err)
+
+    def test_main_handles_oserror(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # README.md does not exist -> OSError when reading
+            code, out, err = self.run_main(root, [])
+            self.assertEqual(code, 1)
+            self.assertIn("error:", err)
 
 
 if __name__ == "__main__":

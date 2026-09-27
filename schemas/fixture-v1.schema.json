@@ -62,17 +62,17 @@
           "raw-ledger-access"
         ]
       },
-      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed."
+      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed. This enum must be kept in sync with CAPABILITIES in tools/validate/validate.py and with canary_core::Capability in StellarCanary/Protocol-Canary; the two lists are maintained independently (a JSON Schema enum and a Python set), so a new capability added to one without the other silently creates a validator/schema mismatch."
     },
     "input_file": {
       "type": "string",
       "minLength": 1,
-      "description": "Path to an externally stored input file, relative to this fixture file's own directory. Existence is checked by the validator; the loader does not read the file's contents itself. (Note: Currently unused by any existing fixture in this repository; values are typically inlined via value_base64.)"
+      "description": "Path to an externally stored input file, relative to this fixture file's own directory. Existence is checked by the validator; the loader does not read the file's contents itself. This is the external-file alternative to inlining the input via value_base64 - a fixture supplies its input one way or the other, not both. Prefer an external file for large inputs (e.g. a multi-kilobyte binary payload) and value_base64 for short XDR values. (Note: Currently unused by any existing fixture in this repository; XDR inputs are inlined via value_base64.)"
     },
     "expected_file": {
       "type": "string",
       "minLength": 1,
-      "description": "Path to an externally stored expected-output file, relative to this fixture file's own directory. (Note: Currently unused by any existing fixture in this repository; values are typically inlined via expected_base64.)"
+      "description": "Path to an externally stored expected-output file, relative to this fixture file's own directory. Existence is checked by the validator; like input_file, the loader does not read the file's contents itself. This is the external-file alternative to inlining the expected value via expected_base64 (used with kind = encode-equals) - a fixture supplies the expected value one way or the other, not both. Prefer an external file for large expected payloads and expected_base64 for short XDR values. (Note: Currently unused by any existing fixture in this repository; expected values are inlined via expected_base64.)"
     }
   },
   "allOf": [
@@ -119,13 +119,13 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["field-exists", "field-type", "field-equals"]
+                  "enum": ["field-exists", "field-absent", "field-type", "field-equals"]
                 },
                 "field": { "type": "string", "minLength": 1 },
                 "value": {},
                 "expected_type": {
                   "type": "string",
-                  "enum": ["string", "integer", "boolean", "array", "object"],
+                  "enum": ["string", "number", "bool", "object", "array", "null"],
                   "description": "JSON type names accepted for an RPC field-type assertion. Keep this enum in sync with RPC_ASSERT_TYPES in tools/validate/validate.py."
                 }
               }

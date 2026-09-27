@@ -135,6 +135,14 @@ input_file = "..."                      # optional, path relative to this file (
 expected_file = "..."                   # optional (currently unused by any fixture)
 ```
 
+`input_file` and `expected_file` are the external-file alternatives to an
+XDR fixture's inline `value_base64`/`expected_base64` fields: a fixture
+supplies a given value one way or the other, not both. Only the referenced
+file's *existence* is checked by the validator — never its contents. Prefer
+an external file for large payloads (e.g. a multi-kilobyte binary blob that
+would make the `*.toml` unreadable) and inline base64 for short XDR values,
+which is what every fixture in this repository currently does.
+
 Per-surface body (everything else in the file):
 
 | Surface | Fields |

@@ -44,16 +44,19 @@ XDR_TYPES = {"StellarValue", "ContractExecutable"}
 # Must be kept in sync with canary-xdr's supported assertion kinds.
 XDR_KINDS = {"decode-success", "decode-failure", "roundtrip", "encode-equals"}
 RPC_METHODS = {"get-network", "get-latest-ledger"}
-RPC_ASSERT_KINDS = {"field-exists", "field-type", "field-equals"}
+RPC_ASSERT_KINDS = {"field-exists", "field-absent", "field-type", "field-equals"}
 # JSON type names accepted for RPC field-type assertions. Keep this set in
 # sync with the `expected_type` enum in schemas/fixture-v1.schema.json.
-RPC_ASSERT_TYPES = {"string", "integer", "boolean", "array", "object"}
+RPC_ASSERT_TYPES = {"string", "number", "bool", "object", "array", "null"}
 SOROBAN_EXPECT_KINDS = {"simulation-success", "simulation-error"}
 # Set of kebab-case capability strings a fixture may list in
 # `required_capabilities`. Must be kept in sync with
 # canary_core::Capability in StellarCanary/Protocol-Canary, whose
-# kebab-case names these mirror (the same cross-reference is documented in
-# schemas/fixture-v1.schema.json's required_capabilities description).
+# kebab-case names these mirror, AND with the required_capabilities
+# enum in schemas/fixture-v1.schema.json (the same cross-reference is
+# documented there). The two lists are maintained independently (a
+# Python set and a JSON Schema enum), so adding a value to one without
+# the other silently creates a validator/schema mismatch.
 CAPABILITIES = {
     "soroban-contract",
     "rpc-client",
@@ -251,10 +254,14 @@ def validate_xdr_body(fx: Fixture, report: Report) -> None:
         )
 
     if _require(data, "value_base64", str, path, report):
+        if not data["value_base64"]:
+            report.error(path, "field 'value_base64' must not be empty")
         _validate_base64(data["value_base64"], "value_base64", path, report)
 
     if (ok_kind and data["kind"] == "encode-equals") or "expected_base64" in data:
         if _require(data, "expected_base64", str, path, report):
+            if not data["expected_base64"]:
+                report.error(path, "field 'expected_base64' must not be empty")
             _validate_base64(data["expected_base64"], "expected_base64", path, report)
 
 
@@ -301,10 +308,23 @@ def validate_rpc_body(fx: Fixture, report: Report) -> None:
 def validate_soroban_body(fx: Fixture, report: Report) -> None:
     data, path = fx.data, fx.path
 
-    _require(data, "source_account", str, path, report)
-    _require(data, "contract_id", str, path, report)
-    _require(data, "function", str, path, report)
+    if _require(data, "source_account", str, path, report) and not data["source_account"]:
+        report.error(path, "field 'source_account' must not be empty")
+    if _require(data, "contract_id", str, path, report) and not data["contract_id"]:
+        report.error(path, "field 'contract_id' must not be empty")
+    if _require(data, "function", str, path, report) and not data["function"]:
+        report.error(path, "field 'function' must not be empty")
     _require(data, "sequence_number", int, path, report)
+
+    # 'args' is optional but, when present, must match the schema's
+    # "args": { "type": "array" } declaration (see
+    # schemas/fixture-v1.schema.json's soroban conditional).
+    if "args" in data and not isinstance(data["args"], list):
+        report.error(
+            path,
+            f"field 'args', if present, must be an array, "
+            f"got {type(data['args']).__name__}",
+        )
 
     if "expect" not in data:
         report.error(path, "missing required field 'expect'")
