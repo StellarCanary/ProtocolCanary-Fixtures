@@ -230,6 +230,13 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("does not resolve to an existing file" in e for e in report.errors))
 
+    def test_rejects_missing_expected_file(self) -> None:
+        bad = VALID_XDR + '\nexpected_file = "does-not-exist.xdr.b64"\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("does not resolve to an existing file" in e for e in report.errors)
+        )
+
     def test_rejects_empty_input_file(self) -> None:
         bad = VALID_XDR + '\ninput_file = ""\n'
         report = self.run_validation({"a.toml": bad})
