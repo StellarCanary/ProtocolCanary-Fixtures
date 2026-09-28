@@ -169,6 +169,15 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
     if ok_id and data["id"] != data["id"].lower():
         report.error(path, "field 'id' must be lowercase")
 
+    # `protocol` has no upper bound on purpose: this validator deliberately
+    # does not maintain a list of supported Stellar protocol versions, so
+    # shipping a new protocol never requires a validator change here. The
+    # cost is that a stray or typo'd value (e.g. 82 where 28 was meant)
+    # passes structural validation silently. Catching that is a pack-level
+    # responsibility, not this validator's: each pack's own test suite
+    # asserts every fixture under protocol-NN/ targets NN (see
+    # tests/test_pack_protocol_28.py's test_every_fixture_targets_protocol_28).
+    # See CONTRIBUTING.md's "Fixture schema" section for the same note.
     ok_protocol = _require(data, "protocol", int, path, report)
     if ok_protocol and data["protocol"] < 1:
         report.error(path, "field 'protocol' must be a positive integer")
@@ -190,7 +199,9 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
             "use a specific CAP/topic slug",
         )
 
-    _require(data, "description", str, path, report)
+    ok_description = _require(data, "description", str, path, report)
+    if ok_description and not data["description"]:
+        report.error(path, "field 'description' must not be empty")
 
     if "source_reference" in data:
         if not isinstance(data["source_reference"], str) or not data["source_reference"]:

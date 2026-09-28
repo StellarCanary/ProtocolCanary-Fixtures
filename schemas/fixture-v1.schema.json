@@ -122,7 +122,9 @@
                   "enum": ["field-exists", "field-absent", "field-type", "field-equals"]
                 },
                 "field": { "type": "string", "minLength": 1 },
-                "value": {},
+                "value": {
+                  "description": "Required when kind = field-equals; compared for exact equality against the decoded JSON value of 'field' in the method's response. Its type is intentionally unconstrained (any JSON/TOML value is accepted) but in practice it must match the JSON type the targeted RPC field actually returns — e.g. protocolVersion is a number and passphrase is a string. An array or inline table only ever matches a field that itself returns an array or object. The JSON type names a field-type assertion may use are listed on expected_type below; there is no equivalent fixed list for value because it is compared to real response data, not to a type name."
+                },
                 "expected_type": {
                   "type": "string",
                   "enum": ["string", "number", "bool", "object", "array", "null"],

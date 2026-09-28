@@ -143,6 +143,19 @@ an external file for large payloads (e.g. a multi-kilobyte binary blob that
 would make the `*.toml` unreadable) and inline base64 for short XDR values,
 which is what every fixture in this repository currently does.
 
+### Protocol version range
+
+`protocol` is **intentionally unbounded above**. The validator checks only
+that it is an integer `>= 1`; it deliberately does not maintain a list of
+supported Stellar protocol versions, so shipping a new protocol never
+requires a validator change here. The trade-off is that a stray or typo'd
+value (for example `82` where `28` was meant) passes structural validation
+silently. Catching that is a pack-level responsibility, not the validator's:
+a pack's own test suite asserts that every fixture under `protocol-NN/`
+targets `NN` — see `tests/test_pack_protocol_28.py`'s
+`test_every_fixture_targets_protocol_28` — so a mistyped `protocol` is caught
+there, and a new pack should add the equivalent test.
+
 Per-surface body (everything else in the file):
 
 | Surface | Fields |

@@ -368,6 +368,18 @@ class ValidatorTests(unittest.TestCase):
         bad = VALID_XDR.replace('description = "example"\n', "")
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("description" in e for e in report.errors))
+
+    def test_rejects_empty_description(self) -> None:
+        # schemas/fixture-v1.schema.json declares description with
+        # minLength 1, so an empty string must fail validation the same way
+        # an empty id or category does, rather than passing structurally.
+        bad = VALID_XDR.replace('description = "example"', 'description = ""')
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("field 'description' must not be empty" in e for e in report.errors),
+            report.errors,
+        )
+
     def test_rejects_empty_id(self) -> None:
         bad = VALID_XDR.replace(
             'id = "p28-xdr-cap83-example"', 'id = ""'
