@@ -500,9 +500,23 @@ method = "get-network"
         self.assertTrue(any("at least one" in e for e in report.errors))
 
     def test_rpc_fixture_rejects_invalid_method(self) -> None:
-        bad = VALID_RPC.replace('method = "get-network"', 'method = "get-balance"')
-        report = self.run_validation({"a.toml": bad})
-        self.assertTrue(any("'method'" in e for e in report.errors))
+        # `get-balance` is a real Stellar RPC method that canary-rpc does not
+        # implement; `getTransactions` is the case #159 asks for. Neither may
+        # be silently accepted just because it looks like a plausible name.
+        for invalid_method in ("get-balance", "getTransactions"):
+            with self.subTest(method=invalid_method):
+                bad = VALID_RPC.replace(
+                    'method = "get-network"', f'method = "{invalid_method}"'
+                )
+                report = self.run_validation({"a.toml": bad})
+                errors = [e for e in report.errors if "'method'" in e]
+                self.assertEqual(len(errors), 1, report.errors)
+                # The error must name the offending method and enumerate the
+                # methods the validator accepts, so that any change to
+                # RPC_METHODS is detectable from the message alone.
+                self.assertIn(invalid_method, errors[0])
+                for supported in ("get-network", "get-latest-ledger"):
+                    self.assertIn(supported, errors[0])
 
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
