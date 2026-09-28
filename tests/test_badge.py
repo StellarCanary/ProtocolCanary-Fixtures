@@ -144,6 +144,20 @@ class BadgeMainTests(unittest.TestCase):
             self.assertEqual(code, 1)
             self.assertIn("error: README.md's fixtures badge is stale", err)
 
+    def test_main_check_does_not_rewrite_a_stale_readme(self) -> None:
+        # --check is the form CI runs against a fresh checkout, so reporting a
+        # stale badge must be read-only: it may exit non-zero, but it must not
+        # silently "fix" README.md as a side effect of the check.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme_file = write(root, "README.md", marked_readme(99))
+            write(root, "protocol-28/xdr/cap-0083/fixture.toml", FIXTURE)
+            code, out, err = self.run_main(root, ["--check"])
+            self.assertEqual(code, 1)
+            self.assertEqual(
+                readme_file.read_text(encoding="utf-8"), marked_readme(99)
+            )
+
     def test_main_updates_stale_readme_when_not_check(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

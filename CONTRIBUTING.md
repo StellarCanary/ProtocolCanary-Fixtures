@@ -28,6 +28,18 @@ To add one:
   `make test` (or `python3 -m unittest discover tests` directly), then run
   `make badge` so README.md's fixture-count badge reflects the new fixture.
 
+## Recording verification dates
+
+When a fixture's header comment records when a live-network observation was
+made (for example, the date an RPC endpoint or a simulation was last checked
+to still return the documented result), write the date as **`YYYY-MM-DD` in
+UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
+appears in a header comment (or otherwise make clear it is UTC).
+
+Rationale: these dates exist so a future reader can judge how stale an
+observation may be. Recording them in local time would make a date recorded
+near a day boundary ambiguous by up to a day, defeating that purpose.
+
 1. **Identify the upstream behavior.** Read the CAP text, the upstream XDR
    definition, the upstream implementation, or the official release/API
    docs — in that order of preference. Never cite a source you have not
@@ -39,7 +51,7 @@ To add one:
    value was derived or observed — e.g. "built with the official
    `stellar-xdr` 28.0.0 crate against the CAP-0083 `StellarValue` type",
    not "looks right". If the header comment records *when* an observation
-   was made, use the date convention below.
+   was made, use the [date convention above](#recording-verification-dates).
 3. **Define a stable ID.** Follow `p<protocol>-<surface>-<slug>` (e.g.
    `p28-xdr-cap85-external-ref-roundtrip`). IDs are lowercase, unique
    across the *entire* repository (the loader validates this across all
@@ -86,18 +98,6 @@ green. If you cannot pin down the exact expected wire representation or
 host-function behavior from an authoritative source, **stop** — do not
 guess a byte sequence or invent an undocumented host function because it
 "looks right". Open an issue describing the gap instead.
-
-## Recording verification dates
-
-When a fixture's header comment records when a live-network observation was
-made (for example, the date an RPC endpoint or a simulation was last checked
-to still return the documented result), write the date as **`YYYY-MM-DD` in
-UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
-appears in a header comment (or otherwise make clear it is UTC).
-
-Rationale: these dates exist so a future reader can judge how stale an
-observation may be. Recording them in local time would make a date recorded
-near a day boundary ambiguous by up to a day, defeating that purpose.
 
 ## Fixture schema
 

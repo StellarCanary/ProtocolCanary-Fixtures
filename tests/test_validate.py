@@ -244,6 +244,17 @@ class ValidatorTests(unittest.TestCase):
             any("field 'input_file', if present, must be a non-empty string" in e for e in report.errors)
         )
 
+    def test_rejects_non_string_input_file(self) -> None:
+        # input_file is read from TOML, so an unquoted value can be parsed as
+        # an int (or any other non-string) instead of the path the contributor
+        # meant. The same guard that rejects an empty input_file must reject a
+        # non-string one rather than attempting to resolve it as a path.
+        bad = VALID_XDR + "\ninput_file = 42\n"
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("field 'input_file', if present, must be a non-empty string" in e for e in report.errors)
+        )
+
     def test_rejects_non_string_expected_file(self) -> None:
         bad = VALID_XDR + '\nexpected_file = 123\n'
         report = self.run_validation({"a.toml": bad})
