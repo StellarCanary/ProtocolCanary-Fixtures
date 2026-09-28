@@ -34,6 +34,11 @@ discussion and diff. New entries must include that link; see
     and malformed-input rejection. ([3f097d1])
   - `p28-rpc-network` — Protocol 28 `getNetwork` identity check, verified
     live against `soroban-testnet.stellar.org`. ([0f54e20])
+  - `p28-rpc-latest-ledger` — Protocol 28 `getLatestLedger` identity check
+    (a numeric `sequence`, `protocolVersion` 28, a string ledger `id`, and
+    no `getNetwork`-only fields), verified live against
+    `soroban-testnet.stellar.org` with `stellar-canary` 0.1.1.
+    ([PR #236])
   - `p28-soroban-native-asset-name` — a Soroban simulation smoke fixture
     (SEP-41 `name()` on the reserved native-asset contract), verified live
     against `soroban-testnet.stellar.org`. ([ea8b63b])
@@ -49,6 +54,12 @@ discussion and diff. New entries must include that link; see
   from `tools/validate/validate.py`'s constants, with coverage in
   `tests/test_validate.py`. `schemas/fixture-v1.schema.json` now also lists
   `source_reference` as required, matching the validator. ([PR #231])
+- `tests/test_documentation_vocabulary.py`, which parses README.md's
+  assertion-vocabulary table and CONTRIBUTING.md's per-surface field table and
+  asserts they name exactly the RPC methods, assertion kinds and surfaces
+  `tools/validate/validate.py` accepts — the documentation leg
+  `schema_sync.py` does not cover, and the drift that issue #162 was about.
+  ([PR #236])
 
 ### Changed
 
@@ -99,6 +110,19 @@ discussion and diff. New entries must include that link; see
   filtering skips, rather than fails, fixtures whose `protocol` does not
   match, cross-referencing `schemas/fixture-v1.schema.json`, and describes
   the schema/validator sync enforcement added above. ([PR #231])
+- `docs/protocol-28.md` records why an RPC fixture can only assert fields
+  `canary-rpc` exposes to assertions: each response is serialized into its
+  typed model (`NetworkInfo`, `LatestLedger`) before asserts run, so
+  `getLatestLedger`'s raw `closeTime`/`headerXdr`/`metadataXdr` are not
+  observable, and a `field-absent` assertion is meaningful only for a field
+  the other method would report. ([PR #236])
+- `.github/PULL_REQUEST_TEMPLATE.md`'s "Tests performed" checklist now
+  includes `python3 tools/badge/badge.py --check`, the CI step that fails a
+  fixture PR whose badge was not regenerated. ([PR #236])
+- `tests/test_validate.py`'s invalid-RPC-method test now asserts the
+  rejection message quotes the rejected method and enumerates the accepted
+  ones, for both `get-balance` and `getTransactions`, instead of only
+  checking that some error mentioned `method`. ([PR #236])
 
 ### Known gaps
 
@@ -142,8 +166,8 @@ discussion and diff. New entries must include that link; see
 <!-- Link definitions: the pull request or commit that introduced each
      entry above. Commits listed here were pushed directly to `main`
      without a pull request; PR #97, PR #143, PR #176, PR #219, PR #231,
-     and PR #232 are the [Unreleased] entries that originated from pull
-     requests. -->
+     PR #232 and PR #236 are the [Unreleased] entries that originated from
+     pull requests. -->
 
 [757e1e7]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/757e1e777489bb5c20e7500b245370de227c66b3
 [5142110]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/51421106999811666502b2e7da7ae3b9e351fd9c
@@ -162,3 +186,4 @@ discussion and diff. New entries must include that link; see
 [PR #219]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/219
 [PR #231]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/231
 [PR #232]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/232
+[PR #236]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/236
