@@ -39,10 +39,19 @@ from pathlib import Path
 # this without a corresponding upstream change would make the validator accept
 # fixtures the loader would reject (or vice versa).
 SURFACES = {"xdr", "rpc", "soroban"}
+# Set of XDR type names supported by canary-xdr. Must be kept in sync with the
+# types canary-xdr actually supports -- an unsupported type is a Protocol-Canary
+# limitation, not something to work around here (see CONTRIBUTING.md, "If you
+# need an XDR type this repository does not yet support"): open an issue/PR
+# against canary-xdr first, and only add the type here once that support is
+# released.
 XDR_TYPES = {"StellarValue", "ContractExecutable"}
 # Set of assertion kinds supported by canary-xdr for a given XDR value.
 # Must be kept in sync with canary-xdr's supported assertion kinds.
 XDR_KINDS = {"decode-success", "decode-failure", "roundtrip", "encode-equals"}
+# Set of RPC methods supported by canary-rpc. Must be kept in sync with the
+# methods canary-rpc actually implements: a value added here only names a string;
+# the corresponding method must already exist upstream in canary-rpc.
 RPC_METHODS = {"get-network", "get-latest-ledger"}
 RPC_ASSERT_KINDS = {"field-exists", "field-absent", "field-type", "field-equals"}
 # JSON type names accepted for RPC field-type assertions. Keep this set in
