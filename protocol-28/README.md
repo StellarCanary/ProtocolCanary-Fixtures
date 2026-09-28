@@ -1,5 +1,7 @@
 # Protocol 28 compatibility pack
 
+This pack contains **6 fixtures**.
+
 Implemented in Stellar Core 28.0.0, Stellar RPC 28.0.0 (integration-tested
 against Soroban host 28.0.1), and the official `stellar-xdr` 28.0.0 crate.
 Includes CAP-0083, CAP-0085, and CAP-0086.

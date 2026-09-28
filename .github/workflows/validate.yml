@@ -4,12 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Documentation links (to CAP text, upstream docs, and this repository's own
+  # files) can rot without any change here, so recheck them on a schedule in
+  # addition to every push and pull request.
+  schedule:
+    - cron: "0 6 * * 1"
 
 permissions:
   contents: read
 
 jobs:
   validate:
+    # A scheduled run exists to recheck documentation links, not to re-run
+    # structural validation against an unchanged tree.
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,3 +42,24 @@ jobs:
 
       - name: Repository tests
         run: python3 -m unittest discover tests -v
+
+  markdown-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check markdown links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          # Covers external links and, because lychee resolves relative paths
+          # on disk, this repository's own inter-file links too. Retries and
+          # the 429 allowance keep transient host/rate-limit responses from
+          # failing an otherwise healthy tree.
+          args: >-
+            --verbose
+            --no-progress
+            --max-retries 2
+            --accept 200,206,429
+            --exclude 'https://www\.contributor-covenant\.org/.*'
+            './**/*.md'
+          fail: true

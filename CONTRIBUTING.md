@@ -28,6 +28,18 @@ To add one:
   `make test` (or `python3 -m unittest discover tests` directly), then run
   `make badge` so README.md's fixture-count badge reflects the new fixture.
 
+## Recording verification dates
+
+When a fixture's header comment records when a live-network observation was
+made (for example, the date an RPC endpoint or a simulation was last checked
+to still return the documented result), write the date as **`YYYY-MM-DD` in
+UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
+appears in a header comment (or otherwise make clear it is UTC).
+
+Rationale: these dates exist so a future reader can judge how stale an
+observation may be. Recording them in local time would make a date recorded
+near a day boundary ambiguous by up to a day, defeating that purpose.
+
 1. **Identify the upstream behavior.** Read the CAP text, the upstream XDR
    definition, the upstream implementation, or the official release/API
    docs — in that order of preference. Never cite a source you have not
@@ -39,7 +51,7 @@ To add one:
    value was derived or observed — e.g. "built with the official
    `stellar-xdr` 28.0.0 crate against the CAP-0083 `StellarValue` type",
    not "looks right". If the header comment records *when* an observation
-   was made, use the date convention below.
+   was made, use the [date convention above](#recording-verification-dates).
 3. **Define a stable ID.** Follow `p<protocol>-<surface>-<slug>` (e.g.
    `p28-xdr-cap85-external-ref-roundtrip`). IDs are lowercase, unique
    across the *entire* repository (the loader validates this across all
@@ -50,7 +62,11 @@ To add one:
 4. **Create deterministic input.** No fixture may depend on ledger state
    that changes between runs (a current ledger sequence, "the latest
    anything") unless the assertion is explicitly scoped as a live-network
-   check and documented as such.
+   check and documented as such. For an XDR `decode-failure` fixture, follow
+   the [malformed-input guidance in `SECURITY.md`](SECURITY.md#parser-safety-in-mind):
+   prefer a specific documented rejection, such as truncation or an invalid
+   discriminant, over arbitrary fuzzing input, and explain the malformation in
+   the fixture's header comment.
 5. **Define an explicit expected result** using the assertion vocabulary
    the target surface actually supports (see "Fixture schema" below) — no
    generic string matching when a typed assertion exists.
@@ -83,18 +99,6 @@ host-function behavior from an authoritative source, **stop** — do not
 guess a byte sequence or invent an undocumented host function because it
 "looks right". Open an issue describing the gap instead.
 
-## Recording verification dates
-
-When a fixture's header comment records when a live-network observation was
-made (for example, the date an RPC endpoint or a simulation was last checked
-to still return the documented result), write the date as **`YYYY-MM-DD` in
-UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
-appears in a header comment (or otherwise make clear it is UTC).
-
-Rationale: these dates exist so a future reader can judge how stale an
-observation may be. Recording them in local time would make a date recorded
-near a day boundary ambiguous by up to a day, defeating that purpose.
-
 ## Fixture schema
 
 This repository's fixture files must conform exactly to what
@@ -107,6 +111,18 @@ linting; if the two ever disagree, `Protocol-Canary`'s implementation wins
 and this repository's schema/validator must be corrected to match — never
 the other way around.
 
+That schema is kept from silently drifting away from
+`tools/validate/validate.py` by `tools/validate/schema_sync.py` — a
+standard-library-only check (there is no third-party JSON Schema engine in
+this repository's dependency set) that compares the schema's enums and
+required-field lists against the validator's constants. The repository test
+suite runs it against the shipped schema (`tests/test_validate.py`), so a
+validator change that adds, removes, or renames a rule — a new XDR `type`, a
+new RPC `method`, a newly required field, a new capability, and so on —
+fails CI unless the same pull request updates `schemas/fixture-v1.schema.json`
+to match. `python3 tools/validate/schema_sync.py` runs the check on its own
+and exits non-zero on any disagreement.
+
 The fixture format is versioned: `schemas/fixture-v1.schema.json` is titled
 "Protocol Canary fixture (schema_version 1)". **Every protocol pack must
 state, in its `docs/protocol-NN.md` or the pack's `README.md`, which fixture
@@ -116,6 +132,26 @@ version is a per-pack property recorded in prose, not a field repeated in
 each fixture file. Recording it from the start is what lets a future format
 revision (e.g. `schema_version 2`) be scoped per pack rather than
 retrofitted by guesswork.
+
+### Protocol filtering is skip-not-fail
+
+A fixture's `protocol` field declares which protocol pack it belongs to.
+When a consumer runs with a protocol filter — for example
+`stellar-canary check --fixtures-dir <checkout> --protocol 28 --json` — every
+fixture whose `protocol` does not equal the requested value is **skipped,
+not failed**. This matches `schemas/fixture-v1.schema.json`'s `protocol`
+description verbatim: "A run whose `--protocol` does not match is skipped,
+not failed."
+
+Once this repository holds more than one populated protocol pack (see the
+`protocol-27/` pack, expected to be populated eventually), that has a
+practical consequence for CI: a run scoped with `--protocol` over the whole
+repository reports fewer fixtures than the tree contains, and a mostly
+skipped run is **not** a validation failure. Do not read a low fixture count
+under `--protocol` filtering as something being wrong with the fixtures.
+`tools/validate/validate.py` itself does not filter by protocol — it
+validates every fixture it finds — so use it (or `make validate`) when you
+want the whole corpus checked regardless of pack.
 
 Common fields (every fixture):
 
@@ -130,6 +166,27 @@ required_capabilities = []              # optional, see fixture-contract.md
 input_file = "..."                      # optional, path relative to this file (currently unused by any fixture)
 expected_file = "..."                   # optional (currently unused by any fixture)
 ```
+
+`input_file` and `expected_file` are the external-file alternatives to an
+XDR fixture's inline `value_base64`/`expected_base64` fields: a fixture
+supplies a given value one way or the other, not both. Only the referenced
+file's *existence* is checked by the validator — never its contents. Prefer
+an external file for large payloads (e.g. a multi-kilobyte binary blob that
+would make the `*.toml` unreadable) and inline base64 for short XDR values,
+which is what every fixture in this repository currently does.
+
+### Protocol version range
+
+`protocol` is **intentionally unbounded above**. The validator checks only
+that it is an integer `>= 1`; it deliberately does not maintain a list of
+supported Stellar protocol versions, so shipping a new protocol never
+requires a validator change here. The trade-off is that a stray or typo'd
+value (for example `82` where `28` was meant) passes structural validation
+silently. Catching that is a pack-level responsibility, not the validator's:
+a pack's own test suite asserts that every fixture under `protocol-NN/`
+targets `NN` — see `tests/test_pack_protocol_28.py`'s
+`test_every_fixture_targets_protocol_28` — so a mistyped `protocol` is caught
+there, and a new pack should add the equivalent test.
 
 Per-surface body (everything else in the file):
 
@@ -166,6 +223,11 @@ If you need an XDR `type` this repository does not yet support, that is a
 issue/PR against `Protocol-Canary`'s `canary-xdr` crate first (see its own
 `CONTRIBUTING.md`), and only add the fixture here once that support exists
 and is released.
+
+The same applies to an RPC `method` outside the `get-network` |
+`get-latest-ledger` pair the table above lists: open an issue/PR against
+`Protocol-Canary`'s `canary-rpc` crate first, and only add the fixture here
+once that support exists and is released.
 
 ## What never belongs in a fixture
 
