@@ -8,6 +8,7 @@ import contextlib
 import copy
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -150,6 +151,43 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": VALID_XDR, "b.toml": other})
         self.assertTrue(any("duplicate fixture id" in e for e in report.errors))
+
+    # os.chmod() does not restrict access on Windows, and root ignores the
+    # permission bits entirely on POSIX, so on both the file stays readable and
+    # this error path cannot be provoked.
+    @unittest.skipIf(
+        os.name != "posix" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+        "os.chmod is not effective on this platform/user",
+    )
+    def test_unreadable_file_reports_a_read_error(self) -> None:
+        """A fixture file that cannot be read yields a 'failed to read file' error.
+
+        Covers the ``except OSError`` branch in ``validate.load_fixture()``.
+        Every other test uses ``TemporaryDirectory()``, where files are always
+        readable, so this error path would otherwise go untested.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = write(root, "a.toml", VALID_XDR)
+            try:
+                os.chmod(path, 0o000)
+                try:
+                    path.read_text(encoding="utf-8")
+                except OSError:
+                    pass
+                else:
+                    self.skipTest("a 0o000 file is still readable here")
+
+                report = validate.validate_directory(root)
+            finally:
+                # Restore permissions before the directory is removed, so
+                # cleanup never depends on the filesystem tolerating 0o000.
+                os.chmod(path, 0o644)
+
+        self.assertFalse(report.ok)
+        matching = [e for e in report.errors if "failed to read file" in e]
+        self.assertTrue(matching, f"expected a read error, got: {report.errors}")
+        self.assertIn("a.toml", matching[0])
 
     def test_rejects_duplicate_ids_across_nested_directories(self) -> None:
         # The repository stores fixtures in nested per-surface/per-CAP
