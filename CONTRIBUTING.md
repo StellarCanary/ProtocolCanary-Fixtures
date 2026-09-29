@@ -260,6 +260,25 @@ structured marker in the schema. This is by design: deprecation is meant
 for humans reading the fixture or reviewing a PR, while automated consumers
 parsing the file via the schema treat it like any other fixture until it is
 fully removed.
+
+## Common validation errors
+
+Quick reference for what contributors hit most often. Each line is the error as
+`make validate` reports it, followed by the usual cause and fix.
+
+| Error | Cause and fix |
+|---|---|
+| `ModuleNotFoundError: No module named 'tomllib'` | Your `python3` is older than 3.11. `tomllib` is a 3.11+ stdlib module and the validator has no third-party dependencies, so there is nothing to install — use a newer interpreter (CI runs 3.11.16). |
+| `no 'source_reference' set; ...` | The fixture omits `source_reference`. Add it: a CAP id (`CAP-0083`) or an authoritative URL such as the RPC method reference. It is an **error**, not a warning. |
+| `field 'category' is too vague ('misc'); use a specific CAP/topic slug` | `category` is one of `misc`, `other`, `test`, `general`. Use a specific CAP or topic slug instead, e.g. `cap-0083` or `network`. |
+| `duplicate fixture id '...': already defined in ...` | Two fixtures share an `id`. Ids must be unique across the whole tree — rename the new one. |
+| `README.md's fixtures badge is stale; run ...` | You added or removed a `*.toml`, so the fixture count in README.md is now wrong. Run `make badge` and commit the result. |
+| `missing required field '...'` with no obvious cause | Usually a typo'd duplicate of the intended field (e.g. `soure_reference`). Unknown top-level fields are silently ignored — see [Unknown top-level fields](#unknown-top-level-fields). |
+
+`make check` runs these in CI's order (`validate` → `badge-check` → `test`) and
+stops at the first failure, so fix and re-run after each change rather than
+chasing several reported errors at once.
+
 ## Updating CHANGELOG.md
 
 Every user-visible change — a new fixture, a validator behavior change, new
