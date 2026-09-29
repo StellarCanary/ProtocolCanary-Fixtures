@@ -354,6 +354,33 @@ class ValidatorTests(unittest.TestCase):
             )
         )
 
+    def test_xdr_fixture_rejects_missing_type(self) -> None:
+        bad = VALID_XDR.replace('type = "StellarValue"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'type'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_kind(self) -> None:
+        bad = VALID_XDR.replace('kind = "decode-success"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'kind'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_value_base64(self) -> None:
+        bad = VALID_XDR.replace('value_base64 = "AAAAAA=="\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any(
+                "missing required field 'value_base64'" in e
+                for e in report.errors
+            ),
+            report.errors,
+        )
+
     def test_encode_equals_requires_expected_base64(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
         report = self.run_validation({"a.toml": bad})
