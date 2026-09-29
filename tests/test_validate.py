@@ -626,6 +626,15 @@ expected_type = "not-a-real-type"
         for supported in ("field-exists", "field-absent", "field-type", "field-equals"):
             self.assertIn(supported, errors[0])
 
+    def test_accepts_rpc_fixture_with_field_exists(self) -> None:
+        fixture = RPC_HEADER + """
+[[assert]]
+kind = "field-exists"
+field = "protocolVersion"
+"""
+        report = self.run_validation({"a.toml": fixture})
+        self.assertEqual(report.errors, [])
+
     def test_accepts_rpc_fixture_with_field_absent(self) -> None:
         fixture = RPC_HEADER + """
 [[assert]]
