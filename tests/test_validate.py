@@ -590,6 +590,28 @@ method = "get-network"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
 
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        """A non-array `assert` value (string, table, integer) must be rejected.
+
+        The existing `test_rpc_fixture_rejects_empty_assert_array` covers
+        the empty-array case. This test covers the non-array case — a
+        different malformed input that hits the same error-reporting line
+        via a different input shape.
+        """
+        bad_cases = [
+            ('assert = "not-an-array"', "string"),
+            ('assert = 42', "integer"),
+            ('assert = true', "boolean"),
+        ]
+        for raw_value, kind in bad_cases:
+            with self.subTest(value_kind=kind):
+                bad = RPC_HEADER + "\n" + raw_value + "\n"
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(
+                    any("'assert' must be a non-empty array" in e for e in report.errors),
+                    f"non-array assert value ({kind}) must be rejected, got: {report.errors}",
+                )
+
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'
         report = self.run_validation({"a.toml": bad})
