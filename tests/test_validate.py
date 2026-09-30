@@ -5,8 +5,10 @@ Run with: python3 -m unittest discover tests
 from __future__ import annotations
 
 import contextlib
+import copy
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -21,6 +23,14 @@ validate = importlib.util.module_from_spec(_spec)
 assert _spec.loader is not None
 sys.modules["validate"] = validate
 _spec.loader.exec_module(validate)
+
+SCHEMA_SYNC_PATH = REPO_ROOT / "tools" / "validate" / "schema_sync.py"
+
+_sync_spec = importlib.util.spec_from_file_location("schema_sync", SCHEMA_SYNC_PATH)
+schema_sync = importlib.util.module_from_spec(_sync_spec)
+assert _sync_spec.loader is not None
+sys.modules["schema_sync"] = schema_sync
+_sync_spec.loader.exec_module(schema_sync)
 
 
 VALID_XDR = """
@@ -81,6 +91,21 @@ def write(dir_path: Path, name: str, contents: str) -> Path:
     return path
 
 
+def run_main(argv: list[str]) -> tuple[int, str, str]:
+    """Invoke ``validate.main`` capturing its (stdout, stderr).
+
+    ``main`` is the actual entry point CI runs (``python3
+    tools/validate/validate.py``): it parses argv, prints its report to
+    stdout/stderr and returns an exit code. It does not return its
+    ``Report``, so tests exercise it the way CI does rather than only
+    through the lower-level ``validate_directory`` helper.
+    """
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        exit_code = validate.main(argv)
+    return exit_code, stdout.getvalue(), stderr.getvalue()
+
+
 class ValidatorTests(unittest.TestCase):
     def run_validation(self, files: dict[str, str]) -> "validate.Report":
         with tempfile.TemporaryDirectory() as tmp:
@@ -126,6 +151,43 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": VALID_XDR, "b.toml": other})
         self.assertTrue(any("duplicate fixture id" in e for e in report.errors))
+
+    # os.chmod() does not restrict access on Windows, and root ignores the
+    # permission bits entirely on POSIX, so on both the file stays readable and
+    # this error path cannot be provoked.
+    @unittest.skipIf(
+        os.name != "posix" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+        "os.chmod is not effective on this platform/user",
+    )
+    def test_unreadable_file_reports_a_read_error(self) -> None:
+        """A fixture file that cannot be read yields a 'failed to read file' error.
+
+        Covers the ``except OSError`` branch in ``validate.load_fixture()``.
+        Every other test uses ``TemporaryDirectory()``, where files are always
+        readable, so this error path would otherwise go untested.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = write(root, "a.toml", VALID_XDR)
+            try:
+                os.chmod(path, 0o000)
+                try:
+                    path.read_text(encoding="utf-8")
+                except OSError:
+                    pass
+                else:
+                    self.skipTest("a 0o000 file is still readable here")
+
+                report = validate.validate_directory(root)
+            finally:
+                # Restore permissions before the directory is removed, so
+                # cleanup never depends on the filesystem tolerating 0o000.
+                os.chmod(path, 0o644)
+
+        self.assertFalse(report.ok)
+        matching = [e for e in report.errors if "failed to read file" in e]
+        self.assertTrue(matching, f"expected a read error, got: {report.errors}")
+        self.assertIn("a.toml", matching[0])
 
     def test_rejects_duplicate_ids_across_nested_directories(self) -> None:
         # The repository stores fixtures in nested per-surface/per-CAP
@@ -292,6 +354,33 @@ class ValidatorTests(unittest.TestCase):
             )
         )
 
+    def test_xdr_fixture_rejects_missing_type(self) -> None:
+        bad = VALID_XDR.replace('type = "StellarValue"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'type'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_kind(self) -> None:
+        bad = VALID_XDR.replace('kind = "decode-success"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'kind'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_value_base64(self) -> None:
+        bad = VALID_XDR.replace('value_base64 = "AAAAAA=="\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any(
+                "missing required field 'value_base64'" in e
+                for e in report.errors
+            ),
+            report.errors,
+        )
+
     def test_encode_equals_requires_expected_base64(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "encode-equals"')
         report = self.run_validation({"a.toml": bad})
@@ -381,9 +470,11 @@ class ValidatorTests(unittest.TestCase):
         self.assertTrue(any("must not be empty" in e and "'category'" in e for e in report.errors))
 
     def test_rejects_vague_category(self) -> None:
-        bad = VALID_XDR.replace('category = "cap-0083"', 'category = "misc"')
-        report = self.run_validation({"a.toml": bad})
-        self.assertTrue(any("too vague" in e for e in report.errors))
+        for vague in ("misc", "other", "test", "general"):
+            with self.subTest(category=vague):
+                bad = VALID_XDR.replace('category = "cap-0083"', f'category = "{vague}"')
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(any("too vague" in e for e in report.errors))
 
     def test_rejects_missing_description(self) -> None:
         bad = VALID_XDR.replace('description = "example"\n', "")
@@ -476,9 +567,23 @@ method = "get-network"
         self.assertTrue(any("at least one" in e for e in report.errors))
 
     def test_rpc_fixture_rejects_invalid_method(self) -> None:
-        bad = VALID_RPC.replace('method = "get-network"', 'method = "get-balance"')
-        report = self.run_validation({"a.toml": bad})
-        self.assertTrue(any("'method'" in e for e in report.errors))
+        # `get-balance` is a real Stellar RPC method that canary-rpc does not
+        # implement; `getTransactions` is the case #159 asks for. Neither may
+        # be silently accepted just because it looks like a plausible name.
+        for invalid_method in ("get-balance", "getTransactions"):
+            with self.subTest(method=invalid_method):
+                bad = VALID_RPC.replace(
+                    'method = "get-network"', f'method = "{invalid_method}"'
+                )
+                report = self.run_validation({"a.toml": bad})
+                errors = [e for e in report.errors if "'method'" in e]
+                self.assertEqual(len(errors), 1, report.errors)
+                # The error must name the offending method and enumerate the
+                # methods the validator accepts, so that any change to
+                # RPC_METHODS is detectable from the message alone.
+                self.assertIn(invalid_method, errors[0])
+                for supported in ("get-network", "get-latest-ledger"):
+                    self.assertIn(supported, errors[0])
 
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
@@ -795,6 +900,86 @@ class QuietFlagTests(unittest.TestCase):
         self.assertNotIn("warning:", out)
         self.assertIn("OK:", out)
         self.assertEqual(code, 0)
+
+
+class SchemaSyncTests(unittest.TestCase):
+    """schemas/fixture-v1.schema.json must not drift from validate.py.
+
+    The schema is this repository's editor-facing mirror of the validator's
+    rules, but nothing consumes it at run time. ``schema_sync.py`` (standard
+    library only) compares the schema's enums and required-field lists with
+    ``validate.py``'s constants; these tests pin that enforcement so a
+    validator change such as adding a new XDR type or RPC method cannot
+    silently leave the schema stale. See CONTRIBUTING.md#fixture-schema.
+    """
+
+    def setUp(self) -> None:
+        self.schema = schema_sync.load_schema()
+        self.validator = validate
+
+    def test_repository_schema_is_in_sync_with_the_validator(self) -> None:
+        self.assertEqual(schema_sync.check_sync(self.schema, self.validator), [])
+
+    def test_main_reports_ok_for_the_repository(self) -> None:
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = schema_sync.main([])
+        self.assertEqual(code, 0, err.getvalue())
+        self.assertIn("OK:", out.getvalue())
+
+    def test_detects_rpc_method_the_schema_lacks(self) -> None:
+        # Simulates validate.py gaining an RPC method the schema does not
+        # list: the schema is unchanged, so dropping a method from its enum
+        # is equivalent to the validator supporting an extra one.
+        drift = copy.deepcopy(self.schema)
+        block = schema_sync.surface_block(drift, "rpc")
+        assert block is not None
+        block["properties"]["method"]["enum"].remove("get-latest-ledger")
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("rpc method enum" in e for e in errors), errors)
+        self.assertTrue(any("get-latest-ledger" in e for e in errors), errors)
+
+    def test_detects_rpc_method_the_validator_lacks(self) -> None:
+        drift = copy.deepcopy(self.schema)
+        block = schema_sync.surface_block(drift, "rpc")
+        assert block is not None
+        block["properties"]["method"]["enum"].append("get-transaction")
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("rpc method enum" in e for e in errors), errors)
+        self.assertTrue(any("get-transaction" in e for e in errors), errors)
+
+    def test_detects_xdr_type_drift(self) -> None:
+        drift = copy.deepcopy(self.schema)
+        block = schema_sync.surface_block(drift, "xdr")
+        assert block is not None
+        block["properties"]["type"]["enum"].append("LedgerEntry")
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("xdr type enum" in e for e in errors), errors)
+
+    def test_detects_missing_required_field(self) -> None:
+        drift = copy.deepcopy(self.schema)
+        drift["required"].remove("source_reference")
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("top-level required fields" in e for e in errors), errors)
+        self.assertTrue(any("source_reference" in e for e in errors), errors)
+
+    def test_detects_capability_drift(self) -> None:
+        drift = copy.deepcopy(self.schema)
+        drift["properties"]["required_capabilities"]["items"]["enum"].append(
+            "time-travel"
+        )
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("required_capabilities enum" in e for e in errors), errors)
+
+    def test_detects_a_missing_surface_block(self) -> None:
+        drift = copy.deepcopy(self.schema)
+        drift["allOf"] = [
+            block
+            for block in drift["allOf"]
+            if block["if"]["properties"]["surface"]["const"] != "soroban"
+        ]
+        errors = schema_sync.check_sync(drift, self.validator)
+        self.assertTrue(any("soroban surface" in e for e in errors), errors)
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ EXPECTED_IDS_BY_SURFACE = {
         "p28-xdr-cap85-external-ref-roundtrip",
         "p28-xdr-cap85-external-ref-malformed",
     },
-    "rpc": {"p28-rpc-network"},
+    "rpc": {"p28-rpc-network", "p28-rpc-latest-ledger"},
     "soroban": {"p28-soroban-native-asset-name"},
 }
 

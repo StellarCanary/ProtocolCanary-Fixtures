@@ -156,11 +156,31 @@ Verified live against `https://soroban-testnet.stellar.org` on
 2026-09-02 (the exact observed response is recorded in the fixture's
 header comment).
 
+`rpc/p28-rpc-latest-ledger.toml` calls the other RPC method
+`canary-rpc` supports, `getLatestLedger`, and asserts the same endpoint
+identity from that response: `protocolVersion` equals 28, `sequence` is
+present and numeric, and `id` (the ledger hash) is a string. It also
+carries the pack's only `field-absent` assertion, checking that this
+method's response does not report `friendbotUrl` — a `getNetwork` field.
+Verified live against `https://soroban-testnet.stellar.org` on
+2026-09-28 UTC with `stellar-canary 0.1.1`.
+
 **Surface.** RPC.
 
+**One caveat that shapes what an RPC fixture can assert.** `canary-rpc`
+serializes each response into its own typed model (`NetworkInfo`,
+`LatestLedger` in `crates/canary-rpc/src/models.rs`) *before* evaluating
+assertions, so a fixture sees only the fields that model carries — not the
+raw RPC response. `getLatestLedger` really also returns `closeTime`,
+`headerXdr` and `metadataXdr`, none of which a fixture can observe. Both
+fixtures above therefore assert only on modeled fields, and a `field-absent`
+assertion is meaningful only for a field the *other* method would report.
+
 **What Canary does not test here.** Anything about a specific downstream
-application's own RPC usage beyond this one endpoint-identity check, and
-anything about mainnet — this fixture was verified against testnet only.
+application's own RPC usage beyond these two endpoint-identity checks, and
+anything about mainnet — both fixtures were verified against testnet only.
+Neither asserts a ledger `sequence`: it advances with every ledger, so
+`p28-rpc-latest-ledger.toml` checks its type only.
 
 ## Soroban simulation smoke test
 

@@ -75,6 +75,34 @@ CAPABILITIES = {
 }
 VAGUE_CATEGORIES = {"misc", "other", "test", "general"}
 
+# Required fields, mirrored by schemas/fixture-v1.schema.json and kept in
+# sync by tools/validate/schema_sync.py (see CONTRIBUTING.md#fixture-schema).
+# The schema's top-level ``required`` array must list exactly
+# ``COMMON_REQUIRED_FIELDS``, and each surface's per-surface ``required``
+# array must list exactly that surface's tuple below. These live here as
+# constants rather than inline in the checks so the sync tool has a single
+# machine-readable source to compare the schema against.
+COMMON_REQUIRED_FIELDS = (
+    "id",
+    "protocol",
+    "surface",
+    "category",
+    "description",
+    "source_reference",
+)
+XDR_REQUIRED_FIELDS = ("type", "kind", "value_base64")
+RPC_REQUIRED_FIELDS = ("method", "assert")
+SOROBAN_REQUIRED_FIELDS = (
+    "source_account",
+    "contract_id",
+    "function",
+    "sequence_number",
+    "expect",
+)
+# Fields required only for one XDR ``kind`` value; mirrors the nested if/then
+# in the schema's xdr block.
+XDR_CONDITIONAL_REQUIRED_FIELDS = {"encode-equals": ("expected_base64",)}
+
 
 @dataclass
 class Fixture:

@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/StellarCanary/ProtocolCanary-Fixtures/main/schemas/fixture-v1.schema.json",
   "title": "Protocol Canary fixture (schema_version 1)",
-  "description": "A single compatibility-assertion fixture consumed by StellarCanary/Protocol-Canary's canary-fixtures loader. This schema mirrors that implementation (see Protocol-Canary's docs/fixture-contract.md); it is a convenience for editor/CI linting in this repository, not an independent specification. On any disagreement, Protocol-Canary's implementation is authoritative. Note: this top-level object intentionally leaves additionalProperties unset, so unknown top-level fields are permitted (not rejected) — matching tools/validate/validate.py, which performs no unknown-field check. See CONTRIBUTING.md for the rationale.",
+  "description": "A single compatibility-assertion fixture consumed by StellarCanary/Protocol-Canary's canary-fixtures loader. This schema mirrors that implementation (see Protocol-Canary's docs/fixture-contract.md); it is a convenience for editor/CI linting in this repository, not an independent specification. On any disagreement, Protocol-Canary's implementation is authoritative. Note: this top-level object intentionally leaves additionalProperties unset, so unknown top-level fields are permitted (not rejected) — matching tools/validate/validate.py, which performs no unknown-field check. tools/validate/schema_sync.py checks this schema's enums and required-field lists against tools/validate/validate.py's constants, so the two cannot drift unnoticed. See CONTRIBUTING.md for the rationale.",
   "type": "object",
-  "required": ["id", "protocol", "surface", "category", "description"],
+  "required": ["id", "protocol", "surface", "category", "description", "source_reference"],
   "$comment": "examples mirrors protocol-28/xdr/cap-0085/p28-xdr-cap85-external-ref-roundtrip.toml; keep the two in sync.",
   "examples": [
     {

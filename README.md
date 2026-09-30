@@ -2,7 +2,7 @@
 
 ![ProtocolCanary-Fixtures](assets/ProtocolCanary-Fixtures-banner.svg)
 
-[![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) <!-- fixtures-badge:start -->[![Fixtures: 6](https://img.shields.io/badge/fixtures-6-blue.svg)](#protocol-packs)<!-- fixtures-badge:end -->
+[![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) <!-- fixtures-badge:start -->[![Fixtures: 7](https://img.shields.io/badge/fixtures-7-blue.svg)](#protocol-packs)<!-- fixtures-badge:end -->
 
 Canonical compatibility fixtures for Stellar Protocol Canary.
 
@@ -146,6 +146,15 @@ but the format supports them. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md#fixture-schema) for the fuller field
 table.
 
+**Currently supported RPC methods.** The `rpc` surface accepts only two
+methods today — `get-network` and `get-latest-ledger`, the same pair listed
+in [`CONTRIBUTING.md`](CONTRIBUTING.md#fixture-schema)'s per-surface table.
+Stellar RPC exposes many more (for example `getTransaction`); a fixture
+naming any other method is rejected by the validator. Adding support for
+another method is a `Protocol-Canary` change first (its `canary-rpc` crate),
+not something to work around here — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md#fixture-schema) for the process.
+
 ### Assertion vocabulary
 
 Each surface states its expected result through a small set of `kind`
@@ -201,6 +210,15 @@ This is structural validation only — it never executes a compatibility
 check itself. CI (`.github/workflows/validate.yml`) runs it, plus
 `python3 -m unittest discover tests` and a fixtures-badge freshness check,
 on every push and pull request.
+
+[`schemas/fixture-v1.schema.json`](schemas/fixture-v1.schema.json) is this
+repository's editor-facing mirror of the validator's rules. It is kept
+honest by [`tools/validate/schema_sync.py`](tools/validate/schema_sync.py),
+a standard-library-only check that compares the schema's enums and required
+fields against `tools/validate/validate.py`'s constants. The repository test
+suite runs it (`tests/test_validate.py`), so a validator rule change — for
+example adding a new XDR type or RPC method — that is not mirrored in the
+schema fails CI rather than leaving the schema silently stale.
 
 **Structural validation is not live-network verification.** A green CI run
 means every fixture is well-formed and internally consistent; it does not
