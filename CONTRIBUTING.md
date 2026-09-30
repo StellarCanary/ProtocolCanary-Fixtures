@@ -27,6 +27,9 @@ To add one:
   table (and the pack's `README.md` for a new CAP or surface), run
   `make test` (or `python3 -m unittest discover tests` directly), then run
   `make badge` so README.md's fixture-count badge reflects the new fixture.
+- **Cover the pack** — if these are the first fixtures in a protocol pack, add
+  that pack's dedicated `tests/test_pack_protocol_NN.py` file in the same
+  change (see "Pack-level test files" below).
 
 ## Recording verification dates
 
@@ -87,11 +90,52 @@ near a day boundary ambiguous by up to a day, defeating that purpose.
    `python3 tools/badge/badge.py --check` and fails if the committed badge
    no longer matches the fixture tree (see
    [README.md](README.md#fixtures-badge)).
+10. **If you populated a previously empty pack**, add that pack's
+    `tests/test_pack_protocol_NN.py` in this same change — see
+    "Pack-level test files" below. A pack-level test is *not* a substitute for
+    any of steps 6-9, and `tests/test_validate.py` does not cover it.
 
 Before pushing, `make check` runs all of the above in one command, in
 the same order CI (`.github/workflows/validate.yml`) runs them.
 
 > **Note**: Do not add a `manifest.toml` or similar discovery/enumeration file. The loader recursively treats every `*.toml` file under `--fixtures-dir` as a fixture, so a manifest `.toml` file would be mis-parsed as a malformed fixture and fail the run (see [README.md](README.md#repository-relationship)).
+
+## Pack-level test files
+
+Every populated protocol pack ships with a dedicated pack-level test file,
+`tests/test_pack_protocol_NN.py`, next to the generic `tests/test_validate.py`.
+[`tests/test_pack_protocol_28.py`](tests/test_pack_protocol_28.py) is the
+existing example: a structural, offline suite (no network, no fixture
+execution) asserting that the pack matches its own documented inventory, for
+example that
+
+- every fixture under `protocol-NN/` targets `protocol = NN` and carries a
+  `source_reference`;
+- the set of fixture IDs per surface matches the pack's documented inventory
+  exactly;
+- fixture IDs named in the `## [Unreleased]` section of `CHANGELOG.md` still
+  exist, or are explicitly marked removed/deprecated;
+- the pack's own documented invariants hold (for protocol-28, the "no fixture
+  claims CAP-0086" gap guard, and the "protocol-27 is still intentionally
+  empty" policy check).
+
+This is separate from `tests/test_validate.py`, which only proves the generic
+format rules. The validator cannot know which fixtures a given pack is
+*supposed* to contain — the pack-level file is what keeps a pack's
+`docs/protocol-NN.md`, its `README.md`, `CHANGELOG.md`, and its actual
+`protocol-NN/` directory from drifting apart. (The "Protocol version range"
+note in the [Fixture schema](#fixture-schema) section covers the related case
+of a mistyped `protocol` value passing structural validation.)
+
+**When you populate a new protocol pack** — for example
+[`protocol-27/README.md`](protocol-27/README.md), which anticipates exactly
+this future change — add the equivalent `tests/test_pack_protocol_NN.py` in
+the same change that adds the pack's first fixtures. Model it on the
+protocol-28 file: replace `EXPECTED_IDS_BY_SURFACE` with your pack's verified
+inventory, assert `protocol = NN` for every fixture, and drop the invariants
+that only make sense for a different or empty pack. No workflow change is
+needed — CI already discovers the file through
+`python3 -m unittest discover tests`.
 
 No fixture should be merged solely because it makes some consumer's CI
 green. If you cannot pin down the exact expected wire representation or
