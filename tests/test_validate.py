@@ -337,6 +337,22 @@ class ValidatorTests(unittest.TestCase):
             report = validate.validate_directory(root)
         self.assertEqual(report.errors, [])
 
+    def test_accepts_an_existing_expected_file(self) -> None:
+        """Positive test: a fixture with a valid `expected_file` reference passes.
+
+        Mirrors `test_accepts_an_existing_input_file` — the two fields share the
+        same existence-check code path in `validate_common_fields`, but only
+        `input_file` had a positive test before. A change that broke
+        `expected_file`'s accept path specifically while leaving `input_file`
+        untouched would not have been caught.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "expected.xdr.b64", "AAAAAA==")
+            write(root, "a.toml", VALID_XDR + '\nexpected_file = "expected.xdr.b64"\n')
+            report = validate.validate_directory(root)
+        self.assertEqual(report.errors, [])
+
     def test_rejects_invalid_expectation_kind(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "not-a-real-kind"')
         report = self.run_validation({"a.toml": bad})
