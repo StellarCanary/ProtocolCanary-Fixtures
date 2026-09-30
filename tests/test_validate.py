@@ -90,6 +90,13 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": VALID_RPC})
         self.assertEqual(report.errors, [])
 
+    def test_accepts_rpc_fixture_with_field_exists_assert(self) -> None:
+        good = VALID_RPC.replace('kind = "field-equals"', 'kind = "field-exists"').replace(
+            "\nvalue = 28\n", "\n"
+        )
+        report = self.run_validation({"a.toml": good})
+        self.assertEqual(report.errors, [])
+
     def test_accepts_a_valid_soroban_fixture(self) -> None:
         report = self.run_validation({"a.toml": VALID_SOROBAN})
         self.assertEqual(report.errors, [])
