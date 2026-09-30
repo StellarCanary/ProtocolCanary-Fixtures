@@ -124,6 +124,19 @@ class ValidatorTests(unittest.TestCase):
             report = validate.validate_directory(root)
         self.assertEqual(report.errors, [])
 
+    def test_rejects_missing_expected_file(self) -> None:
+        bad = VALID_XDR + '\nexpected_file = "does-not-exist.expected.b64"\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("does not resolve to an existing file" in e for e in report.errors))
+
+    def test_accepts_an_existing_expected_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "expected.xdr.b64", "AAAAAA==")
+            write(root, "a.toml", VALID_XDR + '\nexpected_file = "expected.xdr.b64"\n')
+            report = validate.validate_directory(root)
+        self.assertEqual(report.errors, [])
+
     def test_rejects_invalid_expectation_kind(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "not-a-real-kind"')
         report = self.run_validation({"a.toml": bad})
