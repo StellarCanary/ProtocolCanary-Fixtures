@@ -682,6 +682,16 @@ field = "error"
         report = self.run_validation({"a.toml": fixture})
         self.assertEqual(report.errors, [])
 
+    def test_accepts_rpc_fixture_with_field_type(self) -> None:
+        fixture = RPC_HEADER + """
+[[assert]]
+kind = "field-type"
+field = "protocolVersion"
+expected_type = "number"
+"""
+        report = self.run_validation({"a.toml": fixture})
+        self.assertEqual(report.errors, [])
+
     def test_soroban_fixture_requires_expect(self) -> None:
         bad = VALID_SOROBAN.replace("[expect]\nkind = \"simulation-success\"\n", "")
         report = self.run_validation({"a.toml": bad})
