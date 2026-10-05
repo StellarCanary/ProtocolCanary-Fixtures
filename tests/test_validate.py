@@ -484,6 +484,24 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(len(report.errors), 1)
         self.assertIn("failed to read file: Permission denied", report.errors[0])
 
+    def test_rejects_missing_category(self) -> None:
+        data = {
+            "id": "p28-xdr-cap83-missing-category",
+            "protocol": 28,
+            "surface": "xdr",
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("missing-category.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("missing required field 'category'" in error for error in report.errors),
+            report.errors,
+        )
+
     def test_rejects_empty_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
         report = self.run_validation({"a.toml": bad})
