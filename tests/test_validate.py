@@ -612,6 +612,14 @@ method = "get-network"
                 for supported in ("get-network", "get-latest-ledger"):
                     self.assertIn(supported, errors[0])
 
+    def test_rpc_fixture_rejects_missing_method(self) -> None:
+        bad = VALID_RPC.replace('method = "get-network"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'method'" in e for e in report.errors),
+            report.errors,
+        )
+
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
         report = self.run_validation({"a.toml": bad})
