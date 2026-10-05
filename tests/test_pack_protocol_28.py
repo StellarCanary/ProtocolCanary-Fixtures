@@ -34,7 +34,7 @@ EXPECTED_IDS_BY_SURFACE = {
         "p28-xdr-cap85-external-ref-roundtrip",
         "p28-xdr-cap85-external-ref-malformed",
     },
-    "rpc": {"p28-rpc-network"},
+    "rpc": {"p28-rpc-network", "p28-rpc-latest-ledger"},
     "soroban": {"p28-soroban-native-asset-name"},
 }
 
@@ -59,6 +59,17 @@ class Protocol28PackTests(unittest.TestCase):
         for fx in self.fixtures:
             relative_path = fx.path.relative_to(PACK)
             self.assertEqual(relative_path.parts[0], fx.data.get("surface"), fx.path)
+
+    def test_fixture_ids_follow_the_p_protocol_surface_convention(self) -> None:
+        # CONTRIBUTING.md documents `p<protocol>-<surface>-<slug>` for fixture
+        # IDs, and the schema's pattern only requires lowercase/non-empty. This
+        # per-pack check enforces the documented prefix for protocol-28.
+        for fx in self.fixtures:
+            expected_prefix = f"p{fx.data.get('protocol')}-{fx.data.get('surface')}-"
+            self.assertTrue(
+                str(fx.data.get("id", "")).startswith(expected_prefix),
+                f"{fx.path}: id {fx.data.get('id')!r} does not start with {expected_prefix!r}",
+            )
 
     def test_every_fixture_has_a_source_reference(self) -> None:
         for fx in self.fixtures:
@@ -120,5 +131,17 @@ class Protocol28PackTests(unittest.TestCase):
         self.assertEqual(non_empty_dirs, [])
 
 
+    def test_no_fixture_files_outside_allowed_subdirectories(self) -> None:
+        allowed_dirs = {"xdr", "rpc", "soroban"}
+        for toml_path in PACK.rglob("*.toml"):
+            relative_path = toml_path.relative_to(PACK)
+            self.assertIn(
+                relative_path.parts[0],
+                allowed_dirs,
+                f"Fixture file {relative_path} is located outside allowed subdirectories ({allowed_dirs})",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
+

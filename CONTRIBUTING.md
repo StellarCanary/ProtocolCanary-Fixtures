@@ -27,6 +27,21 @@ To add one:
   table (and the pack's `README.md` for a new CAP or surface), run
   `make test` (or `python3 -m unittest discover tests` directly), then run
   `make badge` so README.md's fixture-count badge reflects the new fixture.
+- **Cover the pack** — if these are the first fixtures in a protocol pack, add
+  that pack's dedicated `tests/test_pack_protocol_NN.py` file in the same
+  change (see "Pack-level test files" below).
+
+## Recording verification dates
+
+When a fixture's header comment records when a live-network observation was
+made (for example, the date an RPC endpoint or a simulation was last checked
+to still return the documented result), write the date as **`YYYY-MM-DD` in
+UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
+appears in a header comment (or otherwise make clear it is UTC).
+
+Rationale: these dates exist so a future reader can judge how stale an
+observation may be. Recording them in local time would make a date recorded
+near a day boundary ambiguous by up to a day, defeating that purpose.
 
 1. **Identify the upstream behavior.** Read the CAP text, the upstream XDR
    definition, the upstream implementation, or the official release/API
@@ -39,7 +54,7 @@ To add one:
    value was derived or observed — e.g. "built with the official
    `stellar-xdr` 28.0.0 crate against the CAP-0083 `StellarValue` type",
    not "looks right". If the header comment records *when* an observation
-   was made, use the date convention below.
+   was made, use the [date convention above](#recording-verification-dates).
 3. **Define a stable ID.** Follow `p<protocol>-<surface>-<slug>` (e.g.
    `p28-xdr-cap85-external-ref-roundtrip`). IDs are lowercase, unique
    across the *entire* repository (the loader validates this across all
@@ -50,7 +65,11 @@ To add one:
 4. **Create deterministic input.** No fixture may depend on ledger state
    that changes between runs (a current ledger sequence, "the latest
    anything") unless the assertion is explicitly scoped as a live-network
-   check and documented as such.
+   check and documented as such. For an XDR `decode-failure` fixture, follow
+   the [malformed-input guidance in `SECURITY.md`](SECURITY.md#parser-safety-in-mind):
+   prefer a specific documented rejection, such as truncation or an invalid
+   discriminant, over arbitrary fuzzing input, and explain the malformation in
+   the fixture's header comment.
 5. **Define an explicit expected result** using the assertion vocabulary
    the target surface actually supports (see "Fixture schema" below) — no
    generic string matching when a typed assertion exists.
@@ -71,29 +90,58 @@ To add one:
    `python3 tools/badge/badge.py --check` and fails if the committed badge
    no longer matches the fixture tree (see
    [README.md](README.md#fixtures-badge)).
+10. **If you populated a previously empty pack**, add that pack's
+    `tests/test_pack_protocol_NN.py` in this same change — see
+    "Pack-level test files" below. A pack-level test is *not* a substitute for
+    any of steps 6-9, and `tests/test_validate.py` does not cover it.
 
 Before pushing, `make check` runs all of the above in one command, in
 the same order CI (`.github/workflows/validate.yml`) runs them.
 
 > **Note**: Do not add a `manifest.toml` or similar discovery/enumeration file. The loader recursively treats every `*.toml` file under `--fixtures-dir` as a fixture, so a manifest `.toml` file would be mis-parsed as a malformed fixture and fail the run (see [README.md](README.md#repository-relationship)).
 
+## Pack-level test files
+
+Every populated protocol pack ships with a dedicated pack-level test file,
+`tests/test_pack_protocol_NN.py`, next to the generic `tests/test_validate.py`.
+[`tests/test_pack_protocol_28.py`](tests/test_pack_protocol_28.py) is the
+existing example: a structural, offline suite (no network, no fixture
+execution) asserting that the pack matches its own documented inventory, for
+example that
+
+- every fixture under `protocol-NN/` targets `protocol = NN` and carries a
+  `source_reference`;
+- the set of fixture IDs per surface matches the pack's documented inventory
+  exactly;
+- fixture IDs named in the `## [Unreleased]` section of `CHANGELOG.md` still
+  exist, or are explicitly marked removed/deprecated;
+- the pack's own documented invariants hold (for protocol-28, the "no fixture
+  claims CAP-0086" gap guard, and the "protocol-27 is still intentionally
+  empty" policy check).
+
+This is separate from `tests/test_validate.py`, which only proves the generic
+format rules. The validator cannot know which fixtures a given pack is
+*supposed* to contain — the pack-level file is what keeps a pack's
+`docs/protocol-NN.md`, its `README.md`, `CHANGELOG.md`, and its actual
+`protocol-NN/` directory from drifting apart. (The "Protocol version range"
+note in the [Fixture schema](#fixture-schema) section covers the related case
+of a mistyped `protocol` value passing structural validation.)
+
+**When you populate a new protocol pack** — for example
+[`protocol-27/README.md`](protocol-27/README.md), which anticipates exactly
+this future change — add the equivalent `tests/test_pack_protocol_NN.py` in
+the same change that adds the pack's first fixtures. Model it on the
+protocol-28 file: replace `EXPECTED_IDS_BY_SURFACE` with your pack's verified
+inventory, assert `protocol = NN` for every fixture, and drop the invariants
+that only make sense for a different or empty pack. No workflow change is
+needed — CI already discovers the file through
+`python3 -m unittest discover tests`.
+
 No fixture should be merged solely because it makes some consumer's CI
 green. If you cannot pin down the exact expected wire representation or
 host-function behavior from an authoritative source, **stop** — do not
 guess a byte sequence or invent an undocumented host function because it
 "looks right". Open an issue describing the gap instead.
-
-## Recording verification dates
-
-When a fixture's header comment records when a live-network observation was
-made (for example, the date an RPC endpoint or a simulation was last checked
-to still return the documented result), write the date as **`YYYY-MM-DD` in
-UTC** — e.g. `2026-09-02`. State the `UTC` designation the first time a date
-appears in a header comment (or otherwise make clear it is UTC).
-
-Rationale: these dates exist so a future reader can judge how stale an
-observation may be. Recording them in local time would make a date recorded
-near a day boundary ambiguous by up to a day, defeating that purpose.
 
 ## Fixture schema
 
@@ -107,6 +155,18 @@ linting; if the two ever disagree, `Protocol-Canary`'s implementation wins
 and this repository's schema/validator must be corrected to match — never
 the other way around.
 
+That schema is kept from silently drifting away from
+`tools/validate/validate.py` by `tools/validate/schema_sync.py` — a
+standard-library-only check (there is no third-party JSON Schema engine in
+this repository's dependency set) that compares the schema's enums and
+required-field lists against the validator's constants. The repository test
+suite runs it against the shipped schema (`tests/test_validate.py`), so a
+validator change that adds, removes, or renames a rule — a new XDR `type`, a
+new RPC `method`, a newly required field, a new capability, and so on —
+fails CI unless the same pull request updates `schemas/fixture-v1.schema.json`
+to match. `python3 tools/validate/schema_sync.py` runs the check on its own
+and exits non-zero on any disagreement.
+
 The fixture format is versioned: `schemas/fixture-v1.schema.json` is titled
 "Protocol Canary fixture (schema_version 1)". **Every protocol pack must
 state, in its `docs/protocol-NN.md` or the pack's `README.md`, which fixture
@@ -116,6 +176,26 @@ version is a per-pack property recorded in prose, not a field repeated in
 each fixture file. Recording it from the start is what lets a future format
 revision (e.g. `schema_version 2`) be scoped per pack rather than
 retrofitted by guesswork.
+
+### Protocol filtering is skip-not-fail
+
+A fixture's `protocol` field declares which protocol pack it belongs to.
+When a consumer runs with a protocol filter — for example
+`stellar-canary check --fixtures-dir <checkout> --protocol 28 --json` — every
+fixture whose `protocol` does not equal the requested value is **skipped,
+not failed**. This matches `schemas/fixture-v1.schema.json`'s `protocol`
+description verbatim: "A run whose `--protocol` does not match is skipped,
+not failed."
+
+Once this repository holds more than one populated protocol pack (see the
+`protocol-27/` pack, expected to be populated eventually), that has a
+practical consequence for CI: a run scoped with `--protocol` over the whole
+repository reports fewer fixtures than the tree contains, and a mostly
+skipped run is **not** a validation failure. Do not read a low fixture count
+under `--protocol` filtering as something being wrong with the fixtures.
+`tools/validate/validate.py` itself does not filter by protocol — it
+validates every fixture it finds — so use it (or `make validate`) when you
+want the whole corpus checked regardless of pack.
 
 Common fields (every fixture):
 
@@ -130,6 +210,27 @@ required_capabilities = []              # optional, see fixture-contract.md
 input_file = "..."                      # optional, path relative to this file (currently unused by any fixture)
 expected_file = "..."                   # optional (currently unused by any fixture)
 ```
+
+`input_file` and `expected_file` are the external-file alternatives to an
+XDR fixture's inline `value_base64`/`expected_base64` fields: a fixture
+supplies a given value one way or the other, not both. Only the referenced
+file's *existence* is checked by the validator — never its contents. Prefer
+an external file for large payloads (e.g. a multi-kilobyte binary blob that
+would make the `*.toml` unreadable) and inline base64 for short XDR values,
+which is what every fixture in this repository currently does.
+
+### Protocol version range
+
+`protocol` is **intentionally unbounded above**. The validator checks only
+that it is an integer `>= 1`; it deliberately does not maintain a list of
+supported Stellar protocol versions, so shipping a new protocol never
+requires a validator change here. The trade-off is that a stray or typo'd
+value (for example `82` where `28` was meant) passes structural validation
+silently. Catching that is a pack-level responsibility, not the validator's:
+a pack's own test suite asserts that every fixture under `protocol-NN/`
+targets `NN` — see `tests/test_pack_protocol_28.py`'s
+`test_every_fixture_targets_protocol_28` — so a mistyped `protocol` is caught
+there, and a new pack should add the equivalent test.
 
 Per-surface body (everything else in the file):
 
@@ -157,11 +258,20 @@ misspelled duplicate first. Tightening this (rejecting unknown fields) would be
 a deliberate change requiring a matching update to the test that documents the
 current behavior in `tests/test_validate.py` — never an accidental side effect.
 
+### Protocol filtering behavior
+
+The `protocol` field specifies the Stellar protocol version targeted by the fixture. In accordance with [`schemas/fixture-v1.schema.json`](schemas/fixture-v1.schema.json) (which notes that *"A run whose `--protocol` does not match is skipped, not failed"*), runners filtering fixtures via `--protocol <version>` silently skip fixtures targeting other protocol versions rather than failing the run. When this repository contains fixtures across multiple protocol packs (e.g. `protocol-27/` and `protocol-28/`), executing a run with `--protocol` filtering skips fixtures for other versions by design; this skip-not-fail behavior is normal and should not be misconstrued as a validation failure.
+
 If you need an XDR `type` this repository does not yet support, that is a
 `Protocol-Canary` limitation, not something to work around here — open an
 issue/PR against `Protocol-Canary`'s `canary-xdr` crate first (see its own
 `CONTRIBUTING.md`), and only add the fixture here once that support exists
 and is released.
+
+The same applies to an RPC `method` outside the `get-network` |
+`get-latest-ledger` pair the table above lists: open an issue/PR against
+`Protocol-Canary`'s `canary-rpc` crate first, and only add the fixture here
+once that support exists and is released.
 
 ## What never belongs in a fixture
 
@@ -194,6 +304,25 @@ structured marker in the schema. This is by design: deprecation is meant
 for humans reading the fixture or reviewing a PR, while automated consumers
 parsing the file via the schema treat it like any other fixture until it is
 fully removed.
+
+## Common validation errors
+
+Quick reference for what contributors hit most often. Each line is the error as
+`make validate` reports it, followed by the usual cause and fix.
+
+| Error | Cause and fix |
+|---|---|
+| `ModuleNotFoundError: No module named 'tomllib'` | Your `python3` is older than 3.11. `tomllib` is a 3.11+ stdlib module and the validator has no third-party dependencies, so there is nothing to install — use a newer interpreter (CI runs 3.11.16). |
+| `no 'source_reference' set; ...` | The fixture omits `source_reference`. Add it: a CAP id (`CAP-0083`) or an authoritative URL such as the RPC method reference. It is an **error**, not a warning. |
+| `field 'category' is too vague ('misc'); use a specific CAP/topic slug` | `category` is one of `misc`, `other`, `test`, `general`. Use a specific CAP or topic slug instead, e.g. `cap-0083` or `network`. |
+| `duplicate fixture id '...': already defined in ...` | Two fixtures share an `id`. Ids must be unique across the whole tree — rename the new one. |
+| `README.md's fixtures badge is stale; run ...` | You added or removed a `*.toml`, so the fixture count in README.md is now wrong. Run `make badge` and commit the result. |
+| `missing required field '...'` with no obvious cause | Usually a typo'd duplicate of the intended field (e.g. `soure_reference`). Unknown top-level fields are silently ignored — see [Unknown top-level fields](#unknown-top-level-fields). |
+
+`make check` runs these in CI's order (`validate` → `badge-check` → `test`) and
+stops at the first failure, so fix and re-run after each change rather than
+chasing several reported errors at once.
+
 ## Updating CHANGELOG.md
 
 Every user-visible change — a new fixture, a validator behavior change, new

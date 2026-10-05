@@ -88,14 +88,32 @@ official `stellar-xdr` 28.0.0 crate before being committed.
 externally-managed-executable contract fleet end-to-end (deploy an owner
 contract, write an `ExecutableTagObject` entry, deploy an instance whose
 executable references it, invoke a function through that reference, and
-confirm the resolved Wasm actually runs). Building that verifiably, rather
-than guessing at it, requires deploying real Protocol 28 contracts using a
-brand-new executable type — which needs either upstream `stellar` CLI
-support for constructing an external-ref deployment (not yet available: the
-CLI installed while authoring this pack was 27.1.0) or hand-crafting the
-raw `InvokeHostFunction`/ledger-entry operations directly against the XDR,
-which risks guessing behavior this project's rules forbid. This is tracked
-as a known gap in `CHANGELOG.md`, not silently skipped.
+confirm the resolved Wasm actually runs). At authoring time, the installed
+Rust `stellar` CLI was **27.1.0** and did not provide a supported way to
+construct that deployment. A re-check on **2026-09-25 UTC** of the
+[`stellar-cli` 28.0.0 release](https://github.com/stellar/stellar-cli/releases/tag/v28.0.0)
+(published 2026-08-26) found that it adds Protocol 28 support and can
+resolve, fetch, and invoke existing external references, but
+`stellar contract deploy` still exposes only `--wasm` and `--wasm-hash` for
+selecting the executable; it has no direct external-reference deployment
+option. The v28.0.0
+[CAP-0085 integration test](https://github.com/stellar/stellar-cli/blob/v28.0.0/cmd/crates/soroban-test/tests/it/integration/contract/external_ref.rs)
+demonstrates the owner-side flow with commands equivalent to:
+
+```text
+stellar contract invoke --id <OWNER_ID> -- publish --tag fleet --wasm-hash <WASM_HASH>
+stellar contract invoke --id <OWNER_ID> -- deploy_ref --tag fleet
+```
+
+(the test supplies the configured source account and network). This requires a
+separately deployed owner contract and is not a general CLI construction path.
+The open draft [`stellar-cli` PR #2659](https://github.com/stellar/stellar-cli/pull/2659)
+proposes `--executable-owner` and `--executable-tag`; until that support is
+released, adding a live fixture would require hand-crafting raw
+`InvokeHostFunction`/ledger-entry operations directly against the XDR, which
+risks guessing behavior this project's rules forbid. This gap is tracked by
+[#8](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/8),
+rather than silently skipped.
 
 **Source.** [CAP-0085](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0085.md).
 
@@ -138,11 +156,31 @@ Verified live against `https://soroban-testnet.stellar.org` on
 2026-09-02 (the exact observed response is recorded in the fixture's
 header comment).
 
+`rpc/p28-rpc-latest-ledger.toml` calls the other RPC method
+`canary-rpc` supports, `getLatestLedger`, and asserts the same endpoint
+identity from that response: `protocolVersion` equals 28, `sequence` is
+present and numeric, and `id` (the ledger hash) is a string. It also
+carries the pack's only `field-absent` assertion, checking that this
+method's response does not report `friendbotUrl` — a `getNetwork` field.
+Verified live against `https://soroban-testnet.stellar.org` on
+2026-09-28 UTC with `stellar-canary 0.1.1`.
+
 **Surface.** RPC.
 
+**One caveat that shapes what an RPC fixture can assert.** `canary-rpc`
+serializes each response into its own typed model (`NetworkInfo`,
+`LatestLedger` in `crates/canary-rpc/src/models.rs`) *before* evaluating
+assertions, so a fixture sees only the fields that model carries — not the
+raw RPC response. `getLatestLedger` really also returns `closeTime`,
+`headerXdr` and `metadataXdr`, none of which a fixture can observe. Both
+fixtures above therefore assert only on modeled fields, and a `field-absent`
+assertion is meaningful only for a field the *other* method would report.
+
 **What Canary does not test here.** Anything about a specific downstream
-application's own RPC usage beyond this one endpoint-identity check, and
-anything about mainnet — this fixture was verified against testnet only.
+application's own RPC usage beyond these two endpoint-identity checks, and
+anything about mainnet — both fixtures were verified against testnet only.
+Neither asserts a ledger `sequence`: it advances with every ledger, so
+`p28-rpc-latest-ledger.toml` checks its type only.
 
 ## Soroban simulation smoke test
 
@@ -181,9 +219,13 @@ stellar-canary check --fixtures-dir <checkout-of-this-repo>/protocol-28 --json
 stellar-canary check --fixtures-dir <checkout-of-this-repo> --protocol 28 --json
 ```
 
-Both were run and passed 5/5 against a local `Protocol-Canary` build on
-2026-09-02, confirming this pack is consumable exactly as documented in
-`Protocol-Canary`'s `docs/fixture-contract.md`.
+Both were run on 2026-09-02 against a local `Protocol-Canary` build and
+passed for every fixture in the pack as it stood then, confirming this pack
+is consumable exactly as documented in `Protocol-Canary`'s
+`docs/fixture-contract.md`. This record is deliberately not tied to a
+hardcoded fixture count, so adding a fixture does not make it stale — but a
+newly added fixture is only covered by this record once it has been
+re-verified the same way.
 
 ## Adding more Protocol 28 fixtures
 

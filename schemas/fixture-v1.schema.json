@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/StellarCanary/ProtocolCanary-Fixtures/main/schemas/fixture-v1.schema.json",
   "title": "Protocol Canary fixture (schema_version 1)",
-  "description": "A single compatibility-assertion fixture consumed by StellarCanary/Protocol-Canary's canary-fixtures loader. This schema mirrors that implementation (see Protocol-Canary's docs/fixture-contract.md); it is a convenience for editor/CI linting in this repository, not an independent specification. On any disagreement, Protocol-Canary's implementation is authoritative. Note: this top-level object intentionally leaves additionalProperties unset, so unknown top-level fields are permitted (not rejected) — matching tools/validate/validate.py, which performs no unknown-field check. See CONTRIBUTING.md for the rationale.",
+  "description": "A single compatibility-assertion fixture consumed by StellarCanary/Protocol-Canary's canary-fixtures loader. This schema mirrors that implementation (see Protocol-Canary's docs/fixture-contract.md); it is a convenience for editor/CI linting in this repository, not an independent specification. On any disagreement, Protocol-Canary's implementation is authoritative. Note: this top-level object intentionally leaves additionalProperties unset, so unknown top-level fields are permitted (not rejected) — matching tools/validate/validate.py, which performs no unknown-field check. tools/validate/schema_sync.py checks this schema's enums and required-field lists against tools/validate/validate.py's constants, so the two cannot drift unnoticed. See CONTRIBUTING.md for the rationale.",
   "type": "object",
-  "required": ["id", "protocol", "surface", "category", "description"],
+  "required": ["id", "protocol", "surface", "category", "description", "source_reference"],
   "$comment": "examples mirrors protocol-28/xdr/cap-0085/p28-xdr-cap85-external-ref-roundtrip.toml; keep the two in sync.",
   "examples": [
     {
@@ -39,7 +39,7 @@
     "category": {
       "type": "string",
       "minLength": 1,
-      "description": "Free-text grouping, e.g. a CAP slug (\"cap-0083\") or \"network\"/\"smoke\". Avoid vague values such as misc/other/test/general."
+      "description": "Free-text grouping, e.g. a CAP slug (\"cap-0083\") or \"network\"/\"smoke\". tools/validate/validate.py rejects the vague values \"misc\", \"other\", \"test\" and \"general\" as errors, in any letter case; use a specific CAP or topic slug instead."
     },
     "description": {
       "type": "string",
@@ -62,17 +62,17 @@
           "raw-ledger-access"
         ]
       },
-      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed."
+      "description": "kebab-case canary_core::Capability values. A fixture requiring a capability the target project lacks is skipped, not failed. This enum must be kept in sync with CAPABILITIES in tools/validate/validate.py and with canary_core::Capability in StellarCanary/Protocol-Canary; the two lists are maintained independently (a JSON Schema enum and a Python set), so a new capability added to one without the other silently creates a validator/schema mismatch."
     },
     "input_file": {
       "type": "string",
       "minLength": 1,
-      "description": "Path to an externally stored input file, relative to this fixture file's own directory. Existence is checked by the validator; the loader does not read the file's contents itself. (Note: Currently unused by any existing fixture in this repository; values are typically inlined via value_base64.)"
+      "description": "Path to an externally stored input file, relative to this fixture file's own directory. Existence is checked by the validator; the loader does not read the file's contents itself. This is the external-file alternative to inlining the input via value_base64 - a fixture supplies its input one way or the other, not both. Prefer an external file for large inputs (e.g. a multi-kilobyte binary payload) and value_base64 for short XDR values. (Note: Currently unused by any existing fixture in this repository; XDR inputs are inlined via value_base64.)"
     },
     "expected_file": {
       "type": "string",
       "minLength": 1,
-      "description": "Path to an externally stored expected-output file, relative to this fixture file's own directory. (Note: Currently unused by any existing fixture in this repository; values are typically inlined via expected_base64.)"
+      "description": "Path to an externally stored expected-output file, relative to this fixture file's own directory. Existence is checked by the validator; like input_file, the loader does not read the file's contents itself. This is the external-file alternative to inlining the expected value via expected_base64 (used with kind = encode-equals) - a fixture supplies the expected value one way or the other, not both. Prefer an external file for large expected payloads and expected_base64 for short XDR values. (Note: Currently unused by any existing fixture in this repository; expected values are inlined via expected_base64.)"
     }
   },
   "allOf": [
@@ -119,13 +119,16 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["field-exists", "field-type", "field-equals"]
+                  "enum": ["field-exists", "field-absent", "field-type", "field-equals"]
                 },
                 "field": { "type": "string", "minLength": 1 },
-                "value": {},
+                "value": {
+                  "description": "Required when kind = field-equals; compared for exact equality against the decoded JSON value of 'field' in the method's response. Its type is intentionally unconstrained (any JSON/TOML value is accepted) but in practice it must match the JSON type the targeted RPC field actually returns — e.g. protocolVersion is a number and passphrase is a string. An array or inline table only ever matches a field that itself returns an array or object. The JSON type names a field-type assertion may use are listed on expected_type below; there is no equivalent fixed list for value because it is compared to real response data, not to a type name."
+                },
                 "expected_type": {
                   "type": "string",
-                  "enum": ["string", "integer", "boolean", "array", "object"]
+                  "enum": ["string", "number", "bool", "object", "array", "null"],
+                  "description": "JSON type names accepted for an RPC field-type assertion. Keep this enum in sync with RPC_ASSERT_TYPES in tools/validate/validate.py."
                 }
               }
             }
