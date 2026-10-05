@@ -8,6 +8,7 @@ import contextlib
 import copy
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -127,6 +128,13 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": VALID_RPC})
         self.assertEqual(report.errors, [])
 
+    def test_accepts_rpc_fixture_with_field_exists_assert(self) -> None:
+        good = VALID_RPC.replace('kind = "field-equals"', 'kind = "field-exists"').replace(
+            "\nvalue = 28\n", "\n"
+        )
+        report = self.run_validation({"a.toml": good})
+        self.assertEqual(report.errors, [])
+
     def test_accepts_a_valid_soroban_fixture(self) -> None:
         report = self.run_validation({"a.toml": VALID_SOROBAN})
         self.assertEqual(report.errors, [])
@@ -150,6 +158,43 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": VALID_XDR, "b.toml": other})
         self.assertTrue(any("duplicate fixture id" in e for e in report.errors))
+
+    # os.chmod() does not restrict access on Windows, and root ignores the
+    # permission bits entirely on POSIX, so on both the file stays readable and
+    # this error path cannot be provoked.
+    @unittest.skipIf(
+        os.name != "posix" or (hasattr(os, "geteuid") and os.geteuid() == 0),
+        "os.chmod is not effective on this platform/user",
+    )
+    def test_unreadable_file_reports_a_read_error(self) -> None:
+        """A fixture file that cannot be read yields a 'failed to read file' error.
+
+        Covers the ``except OSError`` branch in ``validate.load_fixture()``.
+        Every other test uses ``TemporaryDirectory()``, where files are always
+        readable, so this error path would otherwise go untested.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = write(root, "a.toml", VALID_XDR)
+            try:
+                os.chmod(path, 0o000)
+                try:
+                    path.read_text(encoding="utf-8")
+                except OSError:
+                    pass
+                else:
+                    self.skipTest("a 0o000 file is still readable here")
+
+                report = validate.validate_directory(root)
+            finally:
+                # Restore permissions before the directory is removed, so
+                # cleanup never depends on the filesystem tolerating 0o000.
+                os.chmod(path, 0o644)
+
+        self.assertFalse(report.ok)
+        matching = [e for e in report.errors if "failed to read file" in e]
+        self.assertTrue(matching, f"expected a read error, got: {report.errors}")
+        self.assertIn("a.toml", matching[0])
 
     def test_rejects_duplicate_ids_across_nested_directories(self) -> None:
         # The repository stores fixtures in nested per-surface/per-CAP
@@ -299,6 +344,19 @@ class ValidatorTests(unittest.TestCase):
             report = validate.validate_directory(root)
         self.assertEqual(report.errors, [])
 
+    def test_rejects_missing_expected_file(self) -> None:
+        bad = VALID_XDR + '\nexpected_file = "does-not-exist.expected.b64"\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("does not resolve to an existing file" in e for e in report.errors))
+
+    def test_accepts_an_existing_expected_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "expected.xdr.b64", "AAAAAA==")
+            write(root, "a.toml", VALID_XDR + '\nexpected_file = "expected.xdr.b64"\n')
+            report = validate.validate_directory(root)
+        self.assertEqual(report.errors, [])
+
     def test_rejects_invalid_expectation_kind(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "not-a-real-kind"')
         report = self.run_validation({"a.toml": bad})
@@ -314,6 +372,33 @@ class ValidatorTests(unittest.TestCase):
                 and "ContractExecutable" in e
                 for e in report.errors
             )
+        )
+
+    def test_xdr_fixture_rejects_missing_type(self) -> None:
+        bad = VALID_XDR.replace('type = "StellarValue"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'type'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_kind(self) -> None:
+        bad = VALID_XDR.replace('kind = "decode-success"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'kind'" in e for e in report.errors),
+            report.errors,
+        )
+
+    def test_xdr_fixture_rejects_missing_value_base64(self) -> None:
+        bad = VALID_XDR.replace('value_base64 = "AAAAAA=="\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any(
+                "missing required field 'value_base64'" in e
+                for e in report.errors
+            ),
+            report.errors,
         )
 
     def test_encode_equals_requires_expected_base64(self) -> None:
@@ -411,6 +496,13 @@ class ValidatorTests(unittest.TestCase):
                 report = self.run_validation({"a.toml": bad})
                 self.assertTrue(any("too vague" in e for e in report.errors))
 
+    def test_rejects_vague_category_in_any_letter_case(self) -> None:
+        for vague in ("Misc", "OTHER", "Test", "GENERAL"):
+            with self.subTest(category=vague):
+                bad = VALID_XDR.replace('category = "cap-0083"', f'category = "{vague}"')
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(any("too vague" in e for e in report.errors), report.errors)
+
     def test_rejects_missing_description(self) -> None:
         bad = VALID_XDR.replace('description = "example"\n', "")
         report = self.run_validation({"a.toml": bad})
@@ -502,14 +594,47 @@ method = "get-network"
         self.assertTrue(any("at least one" in e for e in report.errors))
 
     def test_rpc_fixture_rejects_invalid_method(self) -> None:
-        bad = VALID_RPC.replace('method = "get-network"', 'method = "get-balance"')
+        # `get-balance` is a real Stellar RPC method that canary-rpc does not
+        # implement; `getTransactions` is the case #159 asks for. Neither may
+        # be silently accepted just because it looks like a plausible name.
+        for invalid_method in ("get-balance", "getTransactions"):
+            with self.subTest(method=invalid_method):
+                bad = VALID_RPC.replace(
+                    'method = "get-network"', f'method = "{invalid_method}"'
+                )
+                report = self.run_validation({"a.toml": bad})
+                errors = [e for e in report.errors if "'method'" in e]
+                self.assertEqual(len(errors), 1, report.errors)
+                # The error must name the offending method and enumerate the
+                # methods the validator accepts, so that any change to
+                # RPC_METHODS is detectable from the message alone.
+                self.assertIn(invalid_method, errors[0])
+                for supported in ("get-network", "get-latest-ledger"):
+                    self.assertIn(supported, errors[0])
+
+    def test_rpc_fixture_rejects_missing_method(self) -> None:
+        bad = VALID_RPC.replace('method = "get-network"\n', "")
         report = self.run_validation({"a.toml": bad})
-        self.assertTrue(any("'method'" in e for e in report.errors))
+        self.assertTrue(
+            any("missing required field 'method'" in e for e in report.errors),
+            report.errors,
+        )
 
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
+
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        bad = (
+            RPC_HEADER
+            + '\nassert = { kind = "field-equals", field = "protocolVersion", value = 28 }\n'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("'assert' must be a non-empty array of tables" in e for e in report.errors),
+            report.errors,
+        )
 
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'

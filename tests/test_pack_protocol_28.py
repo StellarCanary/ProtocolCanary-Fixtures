@@ -34,7 +34,7 @@ EXPECTED_IDS_BY_SURFACE = {
         "p28-xdr-cap85-external-ref-roundtrip",
         "p28-xdr-cap85-external-ref-malformed",
     },
-    "rpc": {"p28-rpc-network"},
+    "rpc": {"p28-rpc-network", "p28-rpc-latest-ledger"},
     "soroban": {"p28-soroban-native-asset-name"},
 }
 
@@ -131,5 +131,17 @@ class Protocol28PackTests(unittest.TestCase):
         self.assertEqual(non_empty_dirs, [])
 
 
+    def test_no_fixture_files_outside_allowed_subdirectories(self) -> None:
+        allowed_dirs = {"xdr", "rpc", "soroban"}
+        for toml_path in PACK.rglob("*.toml"):
+            relative_path = toml_path.relative_to(PACK)
+            self.assertIn(
+                relative_path.parts[0],
+                allowed_dirs,
+                f"Fixture file {relative_path} is located outside allowed subdirectories ({allowed_dirs})",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
+

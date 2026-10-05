@@ -27,6 +27,9 @@ To add one:
   table (and the pack's `README.md` for a new CAP or surface), run
   `make test` (or `python3 -m unittest discover tests` directly), then run
   `make badge` so README.md's fixture-count badge reflects the new fixture.
+- **Cover the pack** — if these are the first fixtures in a protocol pack, add
+  that pack's dedicated `tests/test_pack_protocol_NN.py` file in the same
+  change (see "Pack-level test files" below).
 
 ## Recording verification dates
 
@@ -87,11 +90,52 @@ near a day boundary ambiguous by up to a day, defeating that purpose.
    `python3 tools/badge/badge.py --check` and fails if the committed badge
    no longer matches the fixture tree (see
    [README.md](README.md#fixtures-badge)).
+10. **If you populated a previously empty pack**, add that pack's
+    `tests/test_pack_protocol_NN.py` in this same change — see
+    "Pack-level test files" below. A pack-level test is *not* a substitute for
+    any of steps 6-9, and `tests/test_validate.py` does not cover it.
 
 Before pushing, `make check` runs all of the above in one command, in
 the same order CI (`.github/workflows/validate.yml`) runs them.
 
 > **Note**: Do not add a `manifest.toml` or similar discovery/enumeration file. The loader recursively treats every `*.toml` file under `--fixtures-dir` as a fixture, so a manifest `.toml` file would be mis-parsed as a malformed fixture and fail the run (see [README.md](README.md#repository-relationship)).
+
+## Pack-level test files
+
+Every populated protocol pack ships with a dedicated pack-level test file,
+`tests/test_pack_protocol_NN.py`, next to the generic `tests/test_validate.py`.
+[`tests/test_pack_protocol_28.py`](tests/test_pack_protocol_28.py) is the
+existing example: a structural, offline suite (no network, no fixture
+execution) asserting that the pack matches its own documented inventory, for
+example that
+
+- every fixture under `protocol-NN/` targets `protocol = NN` and carries a
+  `source_reference`;
+- the set of fixture IDs per surface matches the pack's documented inventory
+  exactly;
+- fixture IDs named in the `## [Unreleased]` section of `CHANGELOG.md` still
+  exist, or are explicitly marked removed/deprecated;
+- the pack's own documented invariants hold (for protocol-28, the "no fixture
+  claims CAP-0086" gap guard, and the "protocol-27 is still intentionally
+  empty" policy check).
+
+This is separate from `tests/test_validate.py`, which only proves the generic
+format rules. The validator cannot know which fixtures a given pack is
+*supposed* to contain — the pack-level file is what keeps a pack's
+`docs/protocol-NN.md`, its `README.md`, `CHANGELOG.md`, and its actual
+`protocol-NN/` directory from drifting apart. (The "Protocol version range"
+note in the [Fixture schema](#fixture-schema) section covers the related case
+of a mistyped `protocol` value passing structural validation.)
+
+**When you populate a new protocol pack** — for example
+[`protocol-27/README.md`](protocol-27/README.md), which anticipates exactly
+this future change — add the equivalent `tests/test_pack_protocol_NN.py` in
+the same change that adds the pack's first fixtures. Model it on the
+protocol-28 file: replace `EXPECTED_IDS_BY_SURFACE` with your pack's verified
+inventory, assert `protocol = NN` for every fixture, and drop the invariants
+that only make sense for a different or empty pack. No workflow change is
+needed — CI already discovers the file through
+`python3 -m unittest discover tests`.
 
 No fixture should be merged solely because it makes some consumer's CI
 green. If you cannot pin down the exact expected wire representation or
@@ -260,6 +304,25 @@ structured marker in the schema. This is by design: deprecation is meant
 for humans reading the fixture or reviewing a PR, while automated consumers
 parsing the file via the schema treat it like any other fixture until it is
 fully removed.
+
+## Common validation errors
+
+Quick reference for what contributors hit most often. Each line is the error as
+`make validate` reports it, followed by the usual cause and fix.
+
+| Error | Cause and fix |
+|---|---|
+| `ModuleNotFoundError: No module named 'tomllib'` | Your `python3` is older than 3.11. `tomllib` is a 3.11+ stdlib module and the validator has no third-party dependencies, so there is nothing to install — use a newer interpreter (CI runs 3.11.16). |
+| `no 'source_reference' set; ...` | The fixture omits `source_reference`. Add it: a CAP id (`CAP-0083`) or an authoritative URL such as the RPC method reference. It is an **error**, not a warning. |
+| `field 'category' is too vague ('misc'); use a specific CAP/topic slug` | `category` is one of `misc`, `other`, `test`, `general`. Use a specific CAP or topic slug instead, e.g. `cap-0083` or `network`. |
+| `duplicate fixture id '...': already defined in ...` | Two fixtures share an `id`. Ids must be unique across the whole tree — rename the new one. |
+| `README.md's fixtures badge is stale; run ...` | You added or removed a `*.toml`, so the fixture count in README.md is now wrong. Run `make badge` and commit the result. |
+| `missing required field '...'` with no obvious cause | Usually a typo'd duplicate of the intended field (e.g. `soure_reference`). Unknown top-level fields are silently ignored — see [Unknown top-level fields](#unknown-top-level-fields). |
+
+`make check` runs these in CI's order (`validate` → `badge-check` → `test`) and
+stops at the first failure, so fix and re-run after each change rather than
+chasing several reported errors at once.
+
 ## Updating CHANGELOG.md
 
 Every user-visible change — a new fixture, a validator behavior change, new
