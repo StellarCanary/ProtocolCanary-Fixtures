@@ -617,6 +617,17 @@ method = "get-network"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
 
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        bad = (
+            RPC_HEADER
+            + '\nassert = { kind = "field-equals", field = "protocolVersion", value = 28 }\n'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("'assert' must be a non-empty array of tables" in e for e in report.errors),
+            report.errors,
+        )
+
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'
         report = self.run_validation({"a.toml": bad})
