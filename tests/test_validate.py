@@ -128,6 +128,13 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": VALID_RPC})
         self.assertEqual(report.errors, [])
 
+    def test_accepts_rpc_fixture_with_field_exists_assert(self) -> None:
+        good = VALID_RPC.replace('kind = "field-equals"', 'kind = "field-exists"').replace(
+            "\nvalue = 28\n", "\n"
+        )
+        report = self.run_validation({"a.toml": good})
+        self.assertEqual(report.errors, [])
+
     def test_accepts_a_valid_soroban_fixture(self) -> None:
         report = self.run_validation({"a.toml": VALID_SOROBAN})
         self.assertEqual(report.errors, [])
@@ -337,6 +344,19 @@ class ValidatorTests(unittest.TestCase):
             report = validate.validate_directory(root)
         self.assertEqual(report.errors, [])
 
+    def test_rejects_missing_expected_file(self) -> None:
+        bad = VALID_XDR + '\nexpected_file = "does-not-exist.expected.b64"\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("does not resolve to an existing file" in e for e in report.errors))
+
+    def test_accepts_an_existing_expected_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root, "expected.xdr.b64", "AAAAAA==")
+            write(root, "a.toml", VALID_XDR + '\nexpected_file = "expected.xdr.b64"\n')
+            report = validate.validate_directory(root)
+        self.assertEqual(report.errors, [])
+
     def test_rejects_invalid_expectation_kind(self) -> None:
         bad = VALID_XDR.replace('kind = "decode-success"', 'kind = "not-a-real-kind"')
         report = self.run_validation({"a.toml": bad})
@@ -476,6 +496,13 @@ class ValidatorTests(unittest.TestCase):
                 report = self.run_validation({"a.toml": bad})
                 self.assertTrue(any("too vague" in e for e in report.errors))
 
+    def test_rejects_vague_category_in_any_letter_case(self) -> None:
+        for vague in ("Misc", "OTHER", "Test", "GENERAL"):
+            with self.subTest(category=vague):
+                bad = VALID_XDR.replace('category = "cap-0083"', f'category = "{vague}"')
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(any("too vague" in e for e in report.errors), report.errors)
+
     def test_rejects_missing_description(self) -> None:
         bad = VALID_XDR.replace('description = "example"\n', "")
         report = self.run_validation({"a.toml": bad})
@@ -597,6 +624,17 @@ method = "get-network"
         bad = RPC_HEADER + "\nassert = []\n"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
+
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        bad = (
+            RPC_HEADER
+            + '\nassert = { kind = "field-equals", field = "protocolVersion", value = 28 }\n'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("'assert' must be a non-empty array of tables" in e for e in report.errors),
+            report.errors,
+        )
 
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'
