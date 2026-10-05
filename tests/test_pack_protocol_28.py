@@ -131,5 +131,17 @@ class Protocol28PackTests(unittest.TestCase):
         self.assertEqual(non_empty_dirs, [])
 
 
+    def test_no_fixture_files_outside_allowed_subdirectories(self) -> None:
+        allowed_dirs = {"xdr", "rpc", "soroban"}
+        for toml_path in PACK.rglob("*.toml"):
+            relative_path = toml_path.relative_to(PACK)
+            self.assertIn(
+                relative_path.parts[0],
+                allowed_dirs,
+                f"Fixture file {relative_path} is located outside allowed subdirectories ({allowed_dirs})",
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
+

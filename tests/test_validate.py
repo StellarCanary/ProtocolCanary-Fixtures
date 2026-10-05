@@ -514,6 +514,13 @@ class ValidatorTests(unittest.TestCase):
                 report = self.run_validation({"a.toml": bad})
                 self.assertTrue(any("too vague" in e for e in report.errors))
 
+    def test_rejects_vague_category_in_any_letter_case(self) -> None:
+        for vague in ("Misc", "OTHER", "Test", "GENERAL"):
+            with self.subTest(category=vague):
+                bad = VALID_XDR.replace('category = "cap-0083"', f'category = "{vague}"')
+                report = self.run_validation({"a.toml": bad})
+                self.assertTrue(any("too vague" in e for e in report.errors), report.errors)
+
     def test_rejects_missing_description(self) -> None:
         bad = VALID_XDR.replace('description = "example"\n', "")
         report = self.run_validation({"a.toml": bad})
@@ -536,6 +543,11 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("must not be empty" in e and "'id'" in e for e in report.errors))
+
+    def test_rejects_missing_description(self) -> None:
+        bad = VALID_XDR.replace('description = "example"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("description" in e for e in report.errors))
 
     def test_rejects_uppercase_id(self) -> None:
         bad = VALID_XDR.replace(
@@ -623,10 +635,29 @@ method = "get-network"
                 for supported in ("get-network", "get-latest-ledger"):
                     self.assertIn(supported, errors[0])
 
+    def test_rpc_fixture_rejects_missing_method(self) -> None:
+        bad = VALID_RPC.replace('method = "get-network"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'method'" in e for e in report.errors),
+            report.errors,
+        )
+
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
+
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        bad = (
+            RPC_HEADER
+            + '\nassert = { kind = "field-equals", field = "protocolVersion", value = 28 }\n'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("'assert' must be a non-empty array of tables" in e for e in report.errors),
+            report.errors,
+        )
 
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'
