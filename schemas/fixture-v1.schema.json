@@ -39,7 +39,7 @@
     "category": {
       "type": "string",
       "minLength": 1,
-      "description": "Free-text grouping, e.g. a CAP slug (\"cap-0083\") or \"network\"/\"smoke\". Avoid vague values such as misc/other/test/general."
+      "description": "Free-text grouping, e.g. a CAP slug (\"cap-0083\") or \"network\"/\"smoke\". tools/validate/validate.py rejects the vague values \"misc\", \"other\", \"test\" and \"general\" as errors, in any letter case; use a specific CAP or topic slug instead."
     },
     "description": {
       "type": "string",
