@@ -502,6 +502,25 @@ class ValidatorTests(unittest.TestCase):
             report.errors,
         )
 
+    def test_rejects_non_string_category(self) -> None:
+        data = {
+            "id": "p28-xdr-cap83-non-string-category",
+            "protocol": 28,
+            "surface": "xdr",
+            "category": 123,
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("non-string-category.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("field 'category' must be of type str" in error for error in report.errors),
+            report.errors,
+        )
+
     def test_rejects_empty_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
         report = self.run_validation({"a.toml": bad})
