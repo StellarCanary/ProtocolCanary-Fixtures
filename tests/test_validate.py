@@ -484,6 +484,24 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(len(report.errors), 1)
         self.assertIn("failed to read file: Permission denied", report.errors[0])
 
+    def test_rejects_missing_id(self) -> None:
+        data = {
+            "protocol": 28,
+            "surface": "xdr",
+            "category": "cap-0083",
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("missing-id.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("missing required field 'id'" in error for error in report.errors),
+            report.errors,
+        )
+
     def test_rejects_missing_category(self) -> None:
         data = {
             "id": "p28-xdr-cap83-missing-category",
