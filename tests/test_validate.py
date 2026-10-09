@@ -502,6 +502,24 @@ class ValidatorTests(unittest.TestCase):
             report.errors,
         )
 
+    def test_rejects_missing_surface(self) -> None:
+        data = {
+            "id": "p28-xdr-cap83-missing-surface",
+            "protocol": 28,
+            "category": "cap-0083",
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("missing-surface.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("missing required field 'surface'" in error for error in report.errors),
+            report.errors,
+        )
+
     def test_rejects_missing_category(self) -> None:
         data = {
             "id": "p28-xdr-cap83-missing-category",
