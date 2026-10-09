@@ -209,6 +209,32 @@ Soroban-pipeline smoke test, not a CAP-specific one.
   transaction.** Every check above is decode/encode, a read-only RPC call,
   or simulation.
 
+## Live networks that report a newer protocol
+
+Added 2026-10-09. The text above is a historical record of what was true when it
+was written and is left as it was.
+
+`p28-rpc-network` and `p28-rpc-latest-ledger` assert `protocolVersion = 28`.
+They are evidence about Protocol 28 and are never edited to expect a later
+protocol. On 2026-10-09 the Testnet endpoint `soroban-testnet.stellar.org` and a
+public Mainnet endpoint both reported protocol 29 (see
+[`protocol-29-rpc-observations.md`](protocol-29-rpc-observations.md)), so those
+two fixtures fail against them: `stellar-canary check --protocol 28` built from
+`Protocol-Canary` `main` at `1ff7908` gave 5 passed and 2 failed against Testnet,
+the two failures being exactly these fixtures, with the warning
+`the RPC endpoint reports protocol 29, but this run targets protocol 28`. The XDR
+fixtures and the Soroban simulation fixture passed.
+
+An endpoint that reports protocol 29 cannot serve as a live environment that
+matches this pack. That is a correct result, not a defect in the fixtures. To run
+this pack against a network that reports protocol 28 you need an endpoint you
+operate on that protocol. Setting `[tests] rpc = false` in `.stellar-canary.toml`
+makes `check` skip the two RPC fixtures (reported as skipped, with the reason),
+but the Soroban simulation fixture still calls the configured endpoint.
+
+Protocol 29 coverage is developed separately and only from real evidence; see
+[`protocol-29-rpc-observations.md`](protocol-29-rpc-observations.md).
+
 ## Consuming this pack
 
 For a concise index of the fixtures in this pack, see [`protocol-28/README.md`](../protocol-28/README.md).
