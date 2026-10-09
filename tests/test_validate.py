@@ -484,6 +484,61 @@ class ValidatorTests(unittest.TestCase):
         self.assertEqual(len(report.errors), 1)
         self.assertIn("failed to read file: Permission denied", report.errors[0])
 
+    def test_rejects_missing_id(self) -> None:
+        data = {
+            "protocol": 28,
+            "surface": "xdr",
+            "category": "cap-0083",
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("missing-id.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("missing required field 'id'" in error for error in report.errors),
+            report.errors,
+        )
+
+    def test_rejects_missing_category(self) -> None:
+        data = {
+            "id": "p28-xdr-cap83-missing-category",
+            "protocol": 28,
+            "surface": "xdr",
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("missing-category.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("missing required field 'category'" in error for error in report.errors),
+            report.errors,
+        )
+
+    def test_rejects_non_string_category(self) -> None:
+        data = {
+            "id": "p28-xdr-cap83-non-string-category",
+            "protocol": 28,
+            "surface": "xdr",
+            "category": 123,
+            "description": "example",
+            "source_reference": "CAP-0083",
+        }
+        fixture = validate.Fixture(Path("non-string-category.toml"), data)
+        report = validate.Report()
+
+        validate.validate_common_fields(fixture, report)
+
+        self.assertTrue(
+            any("field 'category' must be of type str" in error for error in report.errors),
+            report.errors,
+        )
+
     def test_rejects_empty_category(self) -> None:
         bad = VALID_XDR.replace('category = "cap-0083"', 'category = ""')
         report = self.run_validation({"a.toml": bad})
@@ -525,6 +580,11 @@ class ValidatorTests(unittest.TestCase):
         )
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("must not be empty" in e and "'id'" in e for e in report.errors))
+
+    def test_rejects_missing_description(self) -> None:
+        bad = VALID_XDR.replace('description = "example"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("description" in e for e in report.errors))
 
     def test_rejects_uppercase_id(self) -> None:
         bad = VALID_XDR.replace(
@@ -612,10 +672,29 @@ method = "get-network"
                 for supported in ("get-network", "get-latest-ledger"):
                     self.assertIn(supported, errors[0])
 
+    def test_rpc_fixture_rejects_missing_method(self) -> None:
+        bad = VALID_RPC.replace('method = "get-network"\n', "")
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("missing required field 'method'" in e for e in report.errors),
+            report.errors,
+        )
+
     def test_rpc_fixture_rejects_empty_assert_array(self) -> None:
         bad = RPC_HEADER + "\nassert = []\n"
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("non-empty array" in e for e in report.errors))
+
+    def test_rpc_fixture_rejects_non_array_assert_value(self) -> None:
+        bad = (
+            RPC_HEADER
+            + '\nassert = { kind = "field-equals", field = "protocolVersion", value = 28 }\n'
+        )
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(
+            any("'assert' must be a non-empty array of tables" in e for e in report.errors),
+            report.errors,
+        )
 
     def test_rpc_fixture_rejects_non_table_assert_entry(self) -> None:
         bad = RPC_HEADER + '\nassert = ["not-a-table"]\n'

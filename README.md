@@ -1,6 +1,8 @@
 # ProtocolCanary-Fixtures
 
+
 ![ProtocolCanary-Fixtures](assets/ProtocolCanary-Fixtures-banner.svg)
+
 
 [![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) <!-- fixtures-badge:start -->[![Fixtures: 7](https://img.shields.io/badge/fixtures-7-blue.svg)](#protocol-packs)<!-- fixtures-badge:end -->
 
@@ -232,21 +234,6 @@ therefore keep passing CI long after the live behavior it asserts has
 changed; the date recorded in its header comment is what lets a reader
 judge how stale that observation may be (see the date convention in
 [`CONTRIBUTING.md`](CONTRIBUTING.md#recording-verification-dates)).
-
-The commands CI runs are also available as Makefile targets, so you can
-run exactly what CI runs without typing the commands out:
-
-| Command | What it does |
-|---|---|
-| `make validate` | Structural fixture validation only. |
-| `make badge` | Regenerates README.md's fixture-count badge. |
-| `make badge-check` | Fails if that badge is stale (what CI runs). |
-| `make test` | Repository test suite only. |
-| `make check` | All of the above, in CI's order — the same steps as `.github/workflows/validate.yml`, stopping at the first failure. |
-
-`make check` is the quickest way to confirm a contribution passes CI
-before you push; each target runs from the repository root and exits
-non-zero on the first failure, just like CI's steps do.
 
 ### Fixtures badge
 
