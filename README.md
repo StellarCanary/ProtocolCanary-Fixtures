@@ -91,6 +91,10 @@ You can point `--fixtures-dir` at this repository's root, or at a single
 `protocol-NN/` directory to scope one pack; the loader's protocol filtering
 makes a mixed-protocol directory safe either way.
 
+Interfaces shared with the other two repositories (registry and digest,
+verification evidence, fixture releases) are specified in
+[`docs/contracts.md`](docs/contracts.md).
+
 ## Protocol packs
 
 | Pack | Status | Notes |
