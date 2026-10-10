@@ -299,6 +299,11 @@ class ValidatorTests(unittest.TestCase):
         report = self.run_validation({"a.toml": bad})
         self.assertTrue(any("must be an array" in e for e in report.errors))
 
+    def test_rejects_duplicate_required_capabilities(self) -> None:
+        bad = VALID_XDR + '\nrequired_capabilities = ["rpc-client", "rpc-client"]\n'
+        report = self.run_validation({"a.toml": bad})
+        self.assertTrue(any("duplicate entry" in e for e in report.errors))
+
     def test_rejects_missing_input_file(self) -> None:
         bad = VALID_XDR + '\ninput_file = "does-not-exist.xdr.b64"\n'
         report = self.run_validation({"a.toml": bad})
