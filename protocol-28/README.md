@@ -45,4 +45,5 @@ enumeration.
 
 See [`../docs/protocol-28.md`](../docs/protocol-28.md) for what this pack
 checks, what it deliberately does not (including why CAP-0086 has no
-fixture yet), and source provenance for every assertion above.
+fixture yet, and why there are no simulation-`auth` or resource-estimation
+fixtures), and source provenance for every assertion above.
