@@ -98,6 +98,19 @@ discussion and diff. New entries must include that link; see
   or provably absent contracts only, the unfunded all-zero source account,
   no live-varying state); and covers the validator's `[expect]` rejections.
   ([PR #308])
+- `tools/validate/validate.py --format json`: a machine-readable validation
+  report, one JSON document on stdout and nothing on stderr, shaped
+  `{"valid", "errors", "warnings", "summary"}` where each diagnostic is
+  `{"path", "id", "line", "message"}`. `valid` mirrors the exit code (0
+  valid, 1 invalid); `line` is the fixture's 1-based line when the validator
+  can attribute one (a TOML syntax error, or a located top-level field) and
+  `null` otherwise, never a guess. Diagnostics are now stored as structured
+  records and rendered on demand, so the text and JSON reports are two views
+  of the same data and cannot disagree; `--quiet` suppresses only the text
+  format's warnings. Documented in README.md's Validation section and
+  covered by 12 new tests in `tests/test_validate.py`. Closes
+  [issue #284](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/284).
+  ([PR #311])
 
 ### Changed
 
@@ -277,3 +290,4 @@ discussion and diff. New entries must include that link; see
 [PR #236]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/236
 [PR #252]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/252
 [PR #308]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/308
+[PR #311]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/311
