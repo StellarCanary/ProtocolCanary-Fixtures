@@ -98,6 +98,22 @@ discussion and diff. New entries must include that link; see
   or provably absent contracts only, the unfunded all-zero source account,
   no live-varying state); and covers the validator's `[expect]` rejections.
   ([PR #308])
+- `tests/vectors/cf-02/` and `tests/test_cf02_vectors.py`: the shared
+  conformance vectors for CF-02 (fixture registry and pack digest), which is
+  CF-02-A — three packs (`minimal`, `standard`, `complex`) at three directory
+  depths, each with its pack files' verified path/byte length/SHA-256 and
+  resulting `packDigest` in `expected.json` plus the golden canonical registry
+  manifest, and 57 tests that re-derive every hash and digest from the files on
+  disk, check `tools/registry/generate.py` and `schemas/registry-v1.schema.json`
+  against them, and cover the negative half of the contract (an altered space
+  or CRLF, a reordered key, a reordered manifest array and a renamed file must
+  each change what the contract accepts) together with the byte-versus-
+  component path ordering that separates the two plausible implementations.
+  The recorded values were computed with `sha256sum`/`wc -c`/`printf`, not with
+  the generator, so the vectors define the contract instead of restating it.
+  Closes
+  [issue #286](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/286).
+  ([PR #313])
 
 ### Changed
 
@@ -254,8 +270,8 @@ discussion and diff. New entries must include that link; see
 <!-- Link definitions: the pull request or commit that introduced each
      entry above. Commits listed here were pushed directly to `main`
      without a pull request; PR #97, PR #143, PR #176, PR #219, PR #231,
-     PR #232, PR #236, PR #252 and PR #308 are the [Unreleased] entries that
-     originated from pull requests. -->
+     PR #232, PR #236, PR #252, PR #308 and PR #313 are the [Unreleased]
+     entries that originated from pull requests. -->
 
 [757e1e7]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/757e1e777489bb5c20e7500b245370de227c66b3
 [5142110]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/51421106999811666502b2e7da7ae3b9e351fd9c
@@ -277,3 +293,4 @@ discussion and diff. New entries must include that link; see
 [PR #236]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/236
 [PR #252]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/252
 [PR #308]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/308
+[PR #313]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/313
