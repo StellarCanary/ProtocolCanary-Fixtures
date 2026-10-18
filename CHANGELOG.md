@@ -178,6 +178,37 @@ discussion and diff. New entries must include that link; see
   Protocol 28 and 29 on Testnet and Mainnet, and the network passphrases,
   with `tests/test_upstream_matrix_docs.py` keeping the page and the matrix
   in agreement. ([PR #306])
+- `tests/fixtures/capabilities.json`: the canonical `required_capabilities`
+  vocabulary (the 5 approved capability strings, CF-07 section 9), pinned by
+  `tests/test_validate.py` against `CAPABILITIES` in
+  `tools/validate/validate.py` and the schema's enum, with a positive test
+  for every approved capability and negative tests for unapproved strings
+  (e.g. `fake-cap`). Engine-side parity is tracked in
+  [Protocol-Canary#512](https://github.com/StellarCanary/Protocol-Canary/issues/512).
+  <!-- TODO: switch to the PR link once this PR is opened. -->
+  ([#288])
+- `protocol-29/` baseline pack scaffold: `registry-v1.json` declaring
+  `registryVersion: 1`, `protocol: 29` (integer) and the empty
+  `fixtures: []` array, with `rpc/`, `xdr/` and `soroban/` subdirectories,
+  and `tests/test_protocol29_baseline.py` asserting the manifest against
+  `schemas/registry-v1.schema.json`, the canonical CF-02 section 3/5
+  encoding and `packDigest`, and that the validator accepts the new
+  directory without diagnostics. The empty baseline is a directory
+  scaffold only, never reportable as compatibility coverage;
+  `protocol-28/` is untouched.
+  ([PR #318])
+
+- `protocol-29/evidence/testnet/`: read-only live Testnet evidence corpus
+  (F-034, CF-04-H) — raw JSON-RPC captures of `getNetwork`,
+  `getLatestLedger` and `getVersionInfo` taken 2026-10-18 UTC from
+  `soroban-testnet.stellar.org` (all three report `protocolVersion` 29),
+  stored as data only per CF-04 section 7, plus
+  `tests/test_protocol29_evidence.py` enforcing the closed capture shape,
+  RFC 3339 UTC instants, the endpoint allowlist, the read-only method
+  guard and a no-credentials scan. The corpus establishes the evidence
+  references required before any Protocol 29 fixture is authored.
+  ([PR #319])
+
 
 ### Changed
 
@@ -268,6 +299,17 @@ discussion and diff. New entries must include that link; see
   `test` and `general` as errors, in any letter case, instead of only
   advising against them; a new test pins the mixed-case rejection.
   ([PR #252])
+- `tools/validate/validate.py` and `schemas/fixture-v1.schema.json` now
+  reject unknown keys in a fixture (F-031): an undeclared top-level field
+  (a typo such as `descriptoin`), a key that belongs to another surface,
+  and a misspelled key inside an `[[assert]]` table are errors, with the
+  diagnostic naming the offending key. The schema sets
+  `additionalProperties: false` on every object and declares the union of
+  the common fields and all surface keys at the top level so the closure
+  does not reject valid fixtures. The test that pinned the previous
+  permissive behavior and `CONTRIBUTING.md`'s "Unknown top-level fields"
+  section were updated to match.
+  ([PR #316])
 
 ### Known gaps
 
@@ -369,3 +411,6 @@ discussion and diff. New entries must include that link; see
 [PR #309]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/309
 [PR #313]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/313
 [PR #315]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/315
+[PR #316]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/316
+[PR #318]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/318
+[PR #319]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/319
