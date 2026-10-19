@@ -223,6 +223,22 @@ check itself. CI (`.github/workflows/validate.yml`) runs it, plus
 `python3 -m unittest discover tests` and a fixtures-badge freshness check,
 on every push and pull request.
 
+Pass `--format json` to get the same run as one machine-readable document on
+stdout, with nothing on stderr, so CI and other tooling can ingest it
+directly; the exit code is unchanged (0 if every fixture is valid, 1
+otherwise) and `valid` mirrors it. `--quiet` affects only the default text
+format.
+
+```bash
+python3 tools/validate/validate.py --format json | jq '.summary'
+```
+
+The document is `{"valid": bool, "errors": [...], "warnings": [...],
+"summary": {...}}`, where each diagnostic is `{"path", "id", "line",
+"message"}`. `line` is the fixture's 1-based line number when the validator
+can attribute one (a TOML syntax error, or a located top-level field) and
+`null` otherwise — it is never guessed.
+
 [`schemas/fixture-v1.schema.json`](schemas/fixture-v1.schema.json) is this
 repository's editor-facing mirror of the validator's rules. It is kept
 honest by [`tools/validate/schema_sync.py`](tools/validate/schema_sync.py),
@@ -254,6 +270,21 @@ support they need, which the loader would reject (and, in doing so, abort a run)
 if they sat inside a pack. See
 [`docs/protocol-28.md`](docs/protocol-28.md#the-staged-resource-estimation-corpus)
 for what they assert and what would promote them.
+
+Also outside the packs, for the opposite reason, are
+[`tests/vectors/cf-02/`](tests/vectors/cf-02/): the shared conformance vectors
+for the registry and pack digest contract (CF-02-A). Those packs are ones the
+loader *accepts* — they are kept out of `protocol-*/` because they are contract
+test data rather than protocol fixtures. Three small packs with verified file
+hashes and pack digests, checked offline by
+[`tests/test_cf02_vectors.py`](tests/test_cf02_vectors.py).
+
+The same arrangement covers
+[`tests/vectors/conformance/`](tests/vectors/conformance/): the cross-language
+fixture-parser conformance corpus (24 accept/reject vectors, one of which is deliberately
+unparseable TOML), which is parser input rather than protocol behavior. It is
+checked by [`tests/test_conformance_vectors.py`](tests/test_conformance_vectors.py),
+and is likewise outside every `protocol-*/` scan root.
 
 ### Fixtures badge
 

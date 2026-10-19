@@ -98,6 +98,101 @@ discussion and diff. New entries must include that link; see
   or provably absent contracts only, the unfunded all-zero source account,
   no live-varying state); and covers the validator's `[expect]` rejections.
   ([PR #308])
+- `tests/vectors/conformance/` and `tests/test_conformance_vectors.py`: the
+  cross-language fixture parser conformance corpus (F-021) — 24 vectors, 12
+  accepted and 12 rejected, covering the XDR, RPC and Soroban surfaces and
+  indexed by `vectors.json`. Every rejected vector names an error code and a
+  diagnostic fragment, and the harness requires the fragment to be both a
+  prefix of that code's documented message and present in the validator's
+  actual report, so a vector cannot claim an error class it does not produce;
+  the rejected half covers missing required and conditional fields, wrong field
+  types, an unknown key inside soroban's closed `[expect]` table, an
+  unsupported RPC method, malformed TOML and a non-base64 payload, while the
+  accepted half covers every assertion kind plus a 1 KiB inline payload and the
+  validator's lower boundaries (`protocol = 1`, `sequence_number = 0`, empty
+  `args`). The vectors assert fixture-format behavior only — the XDR bodies are
+  deliberately placeholder values and nothing is executed or checked against a
+  network — and the harness pins the corpus outside every `protocol-*/` scan
+  root, so the fixture-count badge cannot move. Closes
+  [issue #283](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/283).
+  ([PR #315])
+
+- `tools/validate/validate.py` validates verification evidence records
+  (CF-04 section 3, `verificationVersion` 1): `validate_evidence(record)`
+  and `--evidence PATH`, which takes a record file or a directory of
+  `*.json` records. Missing or unknown fields, a hash that is not 64
+  lowercase hex characters, a `checkedAt` that is not a UTC instant, a
+  `live-*` record without `network` (name, passphrase and
+  `observedProtocol`), `endpointHost` or `evidenceRef`, and a record that
+  names a fixture that does not exist or whose hash is not the current
+  file's, are errors. Nothing is scanned unless `--evidence` is given.
+  ([PR #309])
+- `tools/pack/pack.py` and `make pack VERSION=...`: the deterministic
+  `protocolcanary-fixtures-VERSION.tar.gz` for a pack (CF-06 section 2):
+  entries sorted in UTF-8 byte order, uid and gid 0 with empty names,
+  mtime 0, mode 0644 for files and 0755 for directories, a gzip header
+  with no name or time, the pack membership plus `registry.json`, and the
+  D-06 limits (2,000 entries, 16 MiB, 1 MiB per file, depth 8). Building
+  twice gives the same bytes. ([PR #309])
+- `tools/release/manifest.py` and `schemas/release-manifest-v1.schema.json`:
+  the release manifest for an archive (CF-06 section 3), with the archive
+  hash, byte size, entry count, uncompressed size and `packDigest`
+  recomputed from the archived files. Compatible engines are exact
+  versions recorded as unverified. ([PR #309])
+- `tools/pack/verify_archive.py`: extracts an archive under the CF-06
+  section 6 safe-extraction rules into a temporary directory, checks the
+  registry and pack digest, runs the validator over the contents and
+  removes the directory on every path. Exit code 0 valid, 1 invalid, 2
+  unreadable. ([PR #309])
+- `tools/registry/generate.py`, the generator for a pack's `registry-v1.json`
+  (CF-02-B): every fixture and referenced payload hashed with SHA-256 over
+  the raw bytes, fixtures sorted by `id` and payloads by `path`, and the
+  `packDigest`, validated against `schemas/registry-v1.schema.json` before it
+  is written. An invalid pack (symbolic link, escaping payload, names that
+  differ only by case) fails without writing anything. `make registry`
+  writes `PACK/registry-v1.json`; the generated file is not committed yet
+  (CF-02-E). Adds `tools/validate/jsonschema_lite.py`, a standard-library
+  JSON Schema validator that rejects any keyword it does not implement.
+  ([PR #306])
+- `upstream-matrix.json` and `schemas/upstream-matrix.json`: a machine-readable
+  map from Protocol 28 and 29 to the semver range of the Stellar Core,
+  `soroban-rpc` and `rs-soroban-env` releases that belong to each. ([PR #306])
+- `docs/upstream-matrix.md`, linked from the README: the Stellar Core, Stellar
+  RPC, Stellar Horizon and Soroban host environment release and commit for
+  Protocol 28 and 29 on Testnet and Mainnet, and the network passphrases,
+  with `tests/test_upstream_matrix_docs.py` keeping the page and the matrix
+  in agreement. ([PR #306])
+- `tests/fixtures/capabilities.json`: the canonical `required_capabilities`
+  vocabulary (the 5 approved capability strings, CF-07 section 9), pinned by
+  `tests/test_validate.py` against `CAPABILITIES` in
+  `tools/validate/validate.py` and the schema's enum, with a positive test
+  for every approved capability and negative tests for unapproved strings
+  (e.g. `fake-cap`). Engine-side parity is tracked in
+  [Protocol-Canary#512](https://github.com/StellarCanary/Protocol-Canary/issues/512).
+  <!-- TODO: switch to the PR link once this PR is opened. -->
+  ([#288])
+- `protocol-29/` baseline pack scaffold: `registry-v1.json` declaring
+  `registryVersion: 1`, `protocol: 29` (integer) and the empty
+  `fixtures: []` array, with `rpc/`, `xdr/` and `soroban/` subdirectories,
+  and `tests/test_protocol29_baseline.py` asserting the manifest against
+  `schemas/registry-v1.schema.json`, the canonical CF-02 section 3/5
+  encoding and `packDigest`, and that the validator accepts the new
+  directory without diagnostics. The empty baseline is a directory
+  scaffold only, never reportable as compatibility coverage;
+  `protocol-28/` is untouched.
+  ([PR #318])
+
+- `protocol-29/evidence/testnet/`: read-only live Testnet evidence corpus
+  (F-034, CF-04-H) — raw JSON-RPC captures of `getNetwork`,
+  `getLatestLedger` and `getVersionInfo` taken 2026-10-18 UTC from
+  `soroban-testnet.stellar.org` (all three report `protocolVersion` 29),
+  stored as data only per CF-04 section 7, plus
+  `tests/test_protocol29_evidence.py` enforcing the closed capture shape,
+  RFC 3339 UTC instants, the endpoint allowlist, the read-only method
+  guard and a no-credentials scan. The corpus establishes the evidence
+  references required before any Protocol 29 fixture is authored.
+  ([PR #319])
+
 
 ### Changed
 
@@ -114,7 +209,15 @@ discussion and diff. New entries must include that link; see
   genuinely optional, matching the loader's `Option<String>`;
   `test_message_contains_is_optional` pins that so it is not "fixed" into a
   divergence later. ([PR #308])
-
+- `source_reference` must now be a CAP identifier (`CAP-0083`) or an absolute
+  `https://` URL, and a `github.com` or `raw.githubusercontent.com` link must
+  name a full commit SHA or a release tag, not a branch. Free text, relative
+  links, `http://` and URLs with credentials are rejected, with a message
+  that says what to change. The same pattern is in
+  `schemas/fixture-v1.schema.json`, and `schema_sync.py` fails when the two
+  differ. The four CAP-0083 and CAP-0085 fixtures that cited
+  `.../blob/master/...` now cite commit `9cd7030`, whose files are identical;
+  no fixture ID or expected value changed. ([PR #306])
 - The structural validator now rejects an empty-string `description`,
   matching `schemas/fixture-v1.schema.json`'s `minLength: 1` and the
   existing `id`/`category` checks; a regression test covers the case.
@@ -180,6 +283,17 @@ discussion and diff. New entries must include that link; see
   `test` and `general` as errors, in any letter case, instead of only
   advising against them; a new test pins the mixed-case rejection.
   ([PR #252])
+- `tools/validate/validate.py` and `schemas/fixture-v1.schema.json` now
+  reject unknown keys in a fixture (F-031): an undeclared top-level field
+  (a typo such as `descriptoin`), a key that belongs to another surface,
+  and a misspelled key inside an `[[assert]]` table are errors, with the
+  diagnostic naming the offending key. The schema sets
+  `additionalProperties: false` on every object and declares the union of
+  the common fields and all surface keys at the top level so the closure
+  does not reject valid fixtures. The test that pinned the previous
+  permissive behavior and `CONTRIBUTING.md`'s "Unknown top-level fields"
+  section were updated to match.
+  ([PR #316])
 
 ### Known gaps
 
@@ -254,8 +368,8 @@ discussion and diff. New entries must include that link; see
 <!-- Link definitions: the pull request or commit that introduced each
      entry above. Commits listed here were pushed directly to `main`
      without a pull request; PR #97, PR #143, PR #176, PR #219, PR #231,
-     PR #232, PR #236, PR #252 and PR #308 are the [Unreleased] entries that
-     originated from pull requests. -->
+     PR #232, PR #236, PR #252, PR #306, PR #308, PR #309 and PR #315 are the
+     [Unreleased] entries that originated from pull requests. -->
 
 [757e1e7]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/757e1e777489bb5c20e7500b245370de227c66b3
 [5142110]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/commit/51421106999811666502b2e7da7ae3b9e351fd9c
@@ -276,4 +390,10 @@ discussion and diff. New entries must include that link; see
 [PR #232]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/232
 [PR #236]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/236
 [PR #252]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/252
+[PR #306]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/306
 [PR #308]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/308
+[PR #309]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/309
+[PR #315]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/315
+[PR #316]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/316
+[PR #318]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/318
+[PR #319]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/319
