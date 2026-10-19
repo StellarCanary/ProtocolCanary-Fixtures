@@ -13,26 +13,44 @@ fixture's assertion (no decoding, no network calls, no simulation) and
 never treats a fixture field as a command to run.
 
 Usage:
-    python3 tools/validate/validate.py [--quiet] [root ...]
+    python3 tools/validate/validate.py [--quiet] [--format {text,json}] [root ...]
 
 With no arguments, validates every protocol-*/ directory found next to
 this script's repository root. Exits 0 if every fixture is valid, 1
 otherwise.
 
-Warnings are printed to stdout by default; pass ``--quiet`` to suppress
-them. Errors always go to stderr and the final OK/FAILED summary is always
-printed. A missing ``source_reference`` is an error, not a warning: every
-fixture must cite an authoritative upstream source (see CONTRIBUTING.md).
+``--format text`` (the default) prints the human-readable report:
+warnings to stdout, errors to stderr, and the final OK/FAILED summary. Pass
+``--quiet`` to suppress the warnings.
+
+``--format json`` (F-023) prints one structured JSON document on stdout and
+nothing on stderr, so a CI job can ingest it with a single ``json.load`` and
+still read the outcome from the exit code. The document has the shape
+``{"valid": bool, "errors": [...], "warnings": [...], "summary": {...}}``,
+where each diagnostic is ``{"path", "id", "line", "message"}``. ``line`` is
+the fixture's 1-based line number when the validator knows it (a TOML syntax
+error, or a located top-level field) and ``null`` otherwise -- it is never
+guessed, because a wrong line number in a CI log is worse than an absent
+one. ``--quiet`` only affects the text format; the JSON document always
+carries every warning, since a machine consumer decides what to do with
+them. Encoding is deterministic: UTF-8, two-space indent, one trailing
+newline, keys in the documented order.
+
+A missing ``source_reference`` is an error, not a warning: every fixture
+must cite an authoritative upstream source (see CONTRIBUTING.md).
 """
 from __future__ import annotations
 
 import argparse
 import base64
 import binascii
+import hashlib
+import json
 import re
 import sys
 import tomllib
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -73,7 +91,10 @@ SOROBAN_EXPECT_FIELDS = ("kind", "message_contains")
 # enum in schemas/fixture-v1.schema.json (the same cross-reference is
 # documented there). The two lists are maintained independently (a
 # Python set and a JSON Schema enum), so adding a value to one without
-# the other silently creates a validator/schema mismatch.
+# the other silently creates a validator/schema mismatch. The canonical
+# vocabulary is published in tests/fixtures/capabilities.json (F-032),
+# and tests/test_validate.py pins this set, the schema's enum and that
+# file to each other, so a divergence in any of the three fails the suite.
 CAPABILITIES = {
     "soroban-contract",
     "rpc-client",
@@ -141,6 +162,30 @@ SOROBAN_REQUIRED_FIELDS = (
 # in the schema's xdr block.
 XDR_CONDITIONAL_REQUIRED_FIELDS = {"encode-equals": ("expected_base64",)}
 
+# Keys accepted at the top level of a fixture beyond the required common
+# fields (F-031), and the extra keys each surface's body contributes. A
+# fixture's top level accepts COMMON_REQUIRED_FIELDS + these optional keys
+# + exactly its own surface's keys; anything else -- a typo such as
+# ``descriptoin``, or a field that belongs to another surface -- is an
+# error rather than silently ignored, mirroring ``additionalProperties:
+# false`` in schemas/fixture-v1.schema.json. The tuples must stay in sync
+# with that schema's per-surface ``properties`` blocks.
+COMMON_OPTIONAL_FIELDS = ("required_capabilities", "input_file", "expected_file")
+SURFACE_FIELDS = {
+    "xdr": ("type", "kind", "value_base64", "expected_base64"),
+    "rpc": ("method", "assert"),
+    "soroban": (
+        "source_account",
+        "contract_id",
+        "function",
+        "sequence_number",
+        "args",
+        "expect",
+    ),
+}
+# Keys a single [[assert]] table may carry (the schema's assert.items).
+RPC_ASSERT_FIELDS = ("kind", "field", "value", "expected_type")
+
 
 @dataclass
 class Fixture:
@@ -149,9 +194,44 @@ class Fixture:
 
 
 @dataclass
+class Diagnostic:
+    """One error or warning, with the location a machine consumer needs.
+
+    ``line`` is the 1-based line number the validator can attribute to the
+    message, or ``None`` when it cannot. It is never guessed: a reported line
+    that does not hold the offending text is worse for a CI reader than an
+    honest ``null``. See ``_field_line`` and ``_toml_error_line`` for the two
+    places a line is genuinely known.
+    """
+    path: Path
+    message: str
+    fixture_id: str | None = None
+    line: int | None = None
+
+    def format(self) -> str:
+        """The text-format line for this diagnostic: ``path [id]: message``."""
+        if self.fixture_id:
+            return f"{self.path} [{self.fixture_id}]: {self.message}"
+        return f"{self.path}: {self.message}"
+
+    def as_json(self) -> dict:
+        """The JSON object for this diagnostic (key order is part of the format)."""
+        return {
+            "path": str(self.path),
+            "id": self.fixture_id,
+            "line": self.line,
+            "message": self.message,
+        }
+
+
+@dataclass
 class Report:
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    # Diagnostics are stored structured and rendered to text on demand, so the
+    # human-readable report (`errors`/`warnings`) and the JSON report
+    # (`build_json_report`) are two views of exactly the same records and can
+    # never disagree about a message's path, id or line.
+    error_entries: list[Diagnostic] = field(default_factory=list)
+    warning_entries: list[Diagnostic] = field(default_factory=list)
     # Fixture ids keyed by the fixture file's path, for fixtures whose ``id``
     # has already been parsed and validated (see ``known_fixture_id``). Lets
     # error/warning messages name the fixture without each call site having to
@@ -167,25 +247,53 @@ class Report:
         if fixture_id:
             self.fixture_ids[path] = fixture_id
 
-    def _format(self, path: Path, message: str, fixture_id: str | None) -> str:
+    def _diagnostic(
+        self,
+        path: Path,
+        message: str,
+        fixture_id: str | None,
+        line: int | None,
+    ) -> Diagnostic:
         fid = fixture_id if fixture_id is not None else self.fixture_ids.get(path)
-        if fid:
-            return f"{path} [{fid}]: {message}"
-        return f"{path}: {message}"
+        return Diagnostic(path=path, message=message, fixture_id=fid or None, line=line)
 
     def error(
-        self, path: Path, message: str, fixture_id: str | None = None
+        self,
+        path: Path,
+        message: str,
+        fixture_id: str | None = None,
+        line: int | None = None,
     ) -> None:
-        self.errors.append(self._format(path, message, fixture_id))
+        self.error_entries.append(self._diagnostic(path, message, fixture_id, line))
 
     def warning(
-        self, path: Path, message: str, fixture_id: str | None = None
+        self,
+        path: Path,
+        message: str,
+        fixture_id: str | None = None,
+        line: int | None = None,
     ) -> None:
-        self.warnings.append(self._format(path, message, fixture_id))
+        self.warning_entries.append(self._diagnostic(path, message, fixture_id, line))
+
+    def merge(self, other: "Report") -> None:
+        """Absorb another report's diagnostics (used to combine per-root reports)."""
+        self.error_entries.extend(other.error_entries)
+        self.warning_entries.extend(other.warning_entries)
+        self.fixture_ids.update(other.fixture_ids)
+
+    @property
+    def errors(self) -> list[str]:
+        """The error messages in text form, in the order they were reported."""
+        return [entry.format() for entry in self.error_entries]
+
+    @property
+    def warnings(self) -> list[str]:
+        """The warning messages in text form, in the order they were reported."""
+        return [entry.format() for entry in self.warning_entries]
 
     @property
     def ok(self) -> bool:
-        return not self.errors
+        return not self.error_entries
 
 
 def _is_pinned_ref(ref: str) -> bool:
@@ -272,6 +380,39 @@ def find_fixture_files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.toml") if p.is_file())
 
 
+def _toml_error_line(exc: tomllib.TOMLDecodeError) -> int | None:
+    """The 1-based line a TOML syntax error was raised at, when known.
+
+    Python 3.14+ exposes it as ``TOMLDecodeError.lineno``; older (3.11/3.12)
+    interpreters only name it in the message text, so fall back to that rather
+    than reporting no line for a diagnostic whose exact position the parser
+    already computed.
+    """
+    lineno = getattr(exc, "lineno", None)
+    if isinstance(lineno, int) and lineno > 0:
+        return lineno
+    match = re.search(r"\(at line (\d+), column \d+\)", str(exc))
+    return int(match.group(1)) if match else None
+
+
+def _field_line(path: Path, key: str) -> int | None:
+    """The 1-based line defining top-level ``key`` in ``path``, else ``None``.
+
+    Only used for fields the validator has already found must exist (so the
+    key is a top-level fixture field, not an arbitrary needle). ``None`` is
+    returned when the file cannot be read or the key is not defined exactly
+    once -- for example it also appears in a comment -- because pointing at the
+    wrong line would mislead more than omitting the line does.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    pattern = re.compile(rf"^[ \t]*{re.escape(key)}[ \t]*=")
+    matches = [n for n, line in enumerate(text.splitlines(), 1) if pattern.match(line)]
+    return matches[0] if len(matches) == 1 else None
+
+
 def load_fixture(path: Path, report: Report) -> Fixture | None:
     try:
         raw = path.read_text(encoding="utf-8")
@@ -281,7 +422,7 @@ def load_fixture(path: Path, report: Report) -> Fixture | None:
     try:
         data = tomllib.loads(raw)
     except tomllib.TOMLDecodeError as exc:
-        report.error(path, f"invalid TOML: {exc}")
+        report.error(path, f"invalid TOML: {exc}", line=_toml_error_line(exc))
         return None
     return Fixture(path=path, data=data)
 
@@ -310,6 +451,7 @@ def _require(data: dict, key: str, expected_type: type, path: Path, report: Repo
             path,
             f"field {key!r} must be of type {expected_type.__name__}, "
             f"got {type(data[key]).__name__}",
+            line=_field_line(path, key),
         )
         return False
     return True
@@ -320,9 +462,9 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
 
     ok_id = _require(data, "id", str, path, report)
     if ok_id and not data["id"]:
-        report.error(path, "field 'id' must not be empty")
+        report.error(path, "field 'id' must not be empty", line=_field_line(path, "id"))
     if ok_id and data["id"] != data["id"].lower():
-        report.error(path, "field 'id' must be lowercase")
+        report.error(path, "field 'id' must be lowercase", line=_field_line(path, "id"))
 
     # `protocol` has no upper bound on purpose: this validator deliberately
     # does not maintain a list of supported Stellar protocol versions, so
@@ -335,37 +477,53 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
     # See CONTRIBUTING.md's "Fixture schema" section for the same note.
     ok_protocol = _require(data, "protocol", int, path, report)
     if ok_protocol and data["protocol"] < 1:
-        report.error(path, "field 'protocol' must be a positive integer")
+        report.error(
+            path,
+            "field 'protocol' must be a positive integer",
+            line=_field_line(path, "protocol"),
+        )
 
     ok_surface = _require(data, "surface", str, path, report)
     if ok_surface and data["surface"] not in SURFACES:
         report.error(
             path,
             f"field 'surface' must be one of {sorted(SURFACES)}, got {data['surface']!r}",
+            line=_field_line(path, "surface"),
         )
 
     ok_category = _require(data, "category", str, path, report)
     if ok_category and not data["category"]:
-        report.error(path, "field 'category' must not be empty")
+        report.error(path, "field 'category' must not be empty", line=_field_line(path, "category"))
     if ok_category and data["category"].lower() in VAGUE_CATEGORIES:
         report.error(
             path,
             f"field 'category' is too vague ({data['category']!r}); "
             "use a specific CAP/topic slug",
+            line=_field_line(path, "category"),
         )
 
     ok_description = _require(data, "description", str, path, report)
     if ok_description and not data["description"]:
-        report.error(path, "field 'description' must not be empty")
+        report.error(
+            path,
+            "field 'description' must not be empty",
+            line=_field_line(path, "description"),
+        )
 
     if "source_reference" in data:
         if not isinstance(data["source_reference"], str) or not data["source_reference"]:
-            report.error(path, "field 'source_reference', if present, must be a non-empty string")
+            report.error(
+                path,
+                "field 'source_reference', if present, must be a non-empty string",
+                line=_field_line(path, "source_reference"),
+            )
         else:
             problem = check_source_reference(data["source_reference"])
             if problem is not None:
                 report.error(
-                    path, f"field 'source_reference' {problem} (got {data['source_reference']!r})"
+                    path,
+                    f"field 'source_reference' {problem} (got {data['source_reference']!r})",
+                    line=_field_line(path, "source_reference"),
                 )
     else:
         report.error(
@@ -378,7 +536,11 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
     if "required_capabilities" in data:
         caps = data["required_capabilities"]
         if not isinstance(caps, list):
-            report.error(path, "field 'required_capabilities' must be an array")
+            report.error(
+                path,
+                "field 'required_capabilities' must be an array",
+                line=_field_line(path, "required_capabilities"),
+            )
         else:
             seen_caps: set[str] = set()
             for cap in caps:
@@ -386,6 +548,7 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
                     report.error(
                         path,
                         f"duplicate entry {cap!r} in 'required_capabilities'",
+                        line=_field_line(path, "required_capabilities"),
                     )
                 else:
                     seen_caps.add(cap)
@@ -393,12 +556,17 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
                     report.error(
                         path,
                         f"unknown capability {cap!r}; expected one of {sorted(CAPABILITIES)}",
+                        line=_field_line(path, "required_capabilities"),
                     )
 
     for file_field in ("input_file", "expected_file"):
         if file_field in data:
             if not isinstance(data[file_field], str) or not data[file_field]:
-                report.error(path, f"field {file_field!r}, if present, must be a non-empty string")
+                report.error(
+                    path,
+                    f"field {file_field!r}, if present, must be a non-empty string",
+                    line=_field_line(path, file_field),
+                )
                 continue
             referenced = (path.parent / data[file_field]).resolve()
             if not referenced.is_file():
@@ -406,14 +574,47 @@ def validate_common_fields(fx: Fixture, report: Report) -> None:
                     path,
                     f"{file_field} {data[file_field]!r} does not resolve to an existing file "
                     f"(resolved: {referenced})",
+                    line=_field_line(path, file_field),
                 )
+
+
+def validate_top_level_keys(fx: Fixture, report: Report) -> None:
+    """Reject top-level keys the fixture contract does not declare (F-031).
+
+    The top level accepts the common fields plus exactly the keys its own
+    surface consumes, so a typo'd field (``descriptoin``) or one belonging
+    to a different surface fails here instead of passing silently while the
+    intended field is reported missing. The check runs only for a
+    recognized ``surface``: with an unknown surface (already reported by
+    ``validate_common_fields``) every surface key would look undeclared and
+    bury the real error in noise.
+    """
+    surface = fx.data.get("surface")
+    if surface not in SURFACE_FIELDS:
+        return
+    allowed = (
+        set(COMMON_REQUIRED_FIELDS)
+        | set(COMMON_OPTIONAL_FIELDS)
+        | set(SURFACE_FIELDS[surface])
+    )
+    for key in sorted(set(fx.data) - allowed):
+        report.error(
+            fx.path,
+            f"unexpected top-level key {key!r}; a {surface!r} fixture accepts only "
+            f"{sorted(allowed)}",
+            line=_field_line(fx.path, key),
+        )
 
 
 def _validate_base64(value: str, field_name: str, path: Path, report: Report) -> None:
     try:
         base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError) as exc:
-        report.error(path, f"field {field_name!r} is not valid base64: {exc}")
+        report.error(
+            path,
+            f"field {field_name!r} is not valid base64: {exc}",
+            line=_field_line(path, field_name),
+        )
 
 
 def validate_xdr_body(fx: Fixture, report: Report) -> None:
@@ -425,23 +626,34 @@ def validate_xdr_body(fx: Fixture, report: Report) -> None:
             path,
             f"field 'type' must be one of {sorted(XDR_TYPES)} (what canary-xdr currently "
             f"supports), got {data['type']!r}",
+            line=_field_line(path, "type"),
         )
 
     ok_kind = _require(data, "kind", str, path, report)
     if ok_kind and data["kind"] not in XDR_KINDS:
         report.error(
-            path, f"field 'kind' must be one of {sorted(XDR_KINDS)}, got {data['kind']!r}"
+            path,
+            f"field 'kind' must be one of {sorted(XDR_KINDS)}, got {data['kind']!r}",
+            line=_field_line(path, "kind"),
         )
 
     if _require(data, "value_base64", str, path, report):
         if not data["value_base64"]:
-            report.error(path, "field 'value_base64' must not be empty")
+            report.error(
+                path,
+                "field 'value_base64' must not be empty",
+                line=_field_line(path, "value_base64"),
+            )
         _validate_base64(data["value_base64"], "value_base64", path, report)
 
     if (ok_kind and data["kind"] == "encode-equals") or "expected_base64" in data:
         if _require(data, "expected_base64", str, path, report):
             if not data["expected_base64"]:
-                report.error(path, "field 'expected_base64' must not be empty")
+                report.error(
+                    path,
+                    "field 'expected_base64' must not be empty",
+                    line=_field_line(path, "expected_base64"),
+                )
             _validate_base64(data["expected_base64"], "expected_base64", path, report)
 
 
@@ -451,7 +663,9 @@ def validate_rpc_body(fx: Fixture, report: Report) -> None:
     ok_method = _require(data, "method", str, path, report)
     if ok_method and data["method"] not in RPC_METHODS:
         report.error(
-            path, f"field 'method' must be one of {sorted(RPC_METHODS)}, got {data['method']!r}"
+            path,
+            f"field 'method' must be one of {sorted(RPC_METHODS)}, got {data['method']!r}",
+            line=_field_line(path, "method"),
         )
 
     if "assert" not in data:
@@ -471,6 +685,13 @@ def validate_rpc_body(fx: Fixture, report: Report) -> None:
                 path,
                 f"assert[{i}].kind must be one of {sorted(RPC_ASSERT_KINDS)}, got {kind!r}",
             )
+        unknown_assert_keys = sorted(set(a) - set(RPC_ASSERT_FIELDS))
+        if unknown_assert_keys:
+            report.error(
+                path,
+                f"unexpected key(s) {', '.join(repr(k) for k in unknown_assert_keys)} in "
+                f"assert[{i}]; accepted keys are {sorted(RPC_ASSERT_FIELDS)}",
+            )
         if not a.get("field"):
             report.error(path, f"assert[{i}] missing required non-empty 'field'")
         if kind == "field-equals" and "value" not in a:
@@ -489,11 +710,17 @@ def validate_soroban_body(fx: Fixture, report: Report) -> None:
     data, path = fx.data, fx.path
 
     if _require(data, "source_account", str, path, report) and not data["source_account"]:
-        report.error(path, "field 'source_account' must not be empty")
+        report.error(
+            path, "field 'source_account' must not be empty", line=_field_line(path, "source_account")
+        )
     if _require(data, "contract_id", str, path, report) and not data["contract_id"]:
-        report.error(path, "field 'contract_id' must not be empty")
+        report.error(
+            path, "field 'contract_id' must not be empty", line=_field_line(path, "contract_id")
+        )
     if _require(data, "function", str, path, report) and not data["function"]:
-        report.error(path, "field 'function' must not be empty")
+        report.error(
+            path, "field 'function' must not be empty", line=_field_line(path, "function")
+        )
     _require(data, "sequence_number", int, path, report)
 
     # 'args' is optional but, when present, must match the schema's
@@ -531,6 +758,7 @@ def validate_soroban_body(fx: Fixture, report: Report) -> None:
         report.error(
             path,
             f"expect.kind must be one of {sorted(SOROBAN_EXPECT_KINDS)}, got {kind!r}",
+            line=_field_line(path, "kind"),
         )
 
     # `message_contains` is genuinely optional: canary-soroban models it as
@@ -549,12 +777,14 @@ def validate_soroban_body(fx: Fixture, report: Report) -> None:
                 f"expect.message_contains must be a string, got {type(needle).__name__}; "
                 "canary-soroban ignores a non-string value, which would silently weaken "
                 "the assertion to 'the simulation failed'",
+                line=_field_line(path, "message_contains"),
             )
         elif not needle:
             report.error(
                 path,
                 "expect.message_contains must not be empty; an empty needle matches every "
                 "error message, so the assertion would be no stronger than omitting it",
+                line=_field_line(path, "message_contains"),
             )
 
 
@@ -577,7 +807,9 @@ def validate_unique_ids(fixtures: list[Fixture], report: Report) -> None:
             continue
         if fid in seen:
             report.error(
-                fx.path, f"duplicate fixture id {fid!r}: already defined in {seen[fid]}"
+                fx.path,
+                f"duplicate fixture id {fid!r}: already defined in {seen[fid]}",
+                line=_field_line(fx.path, "id"),
             )
         else:
             seen[fid] = fx.path
@@ -597,9 +829,226 @@ def validate_directory(root: Path) -> Report:
     for fx in fixtures:
         validate_common_fields(fx, report)
         validate_body(fx, report)
+        validate_top_level_keys(fx, report)
 
     validate_unique_ids(fixtures, report)
     return report
+
+
+# --------------------------------------------------- verification evidence
+#
+# CF-04 section 3 (``verificationVersion`` 1). The rules below mirror
+# ``schemas/verification-v1.schema.json`` and add the two that a schema cannot
+# express: a live record must carry the evidence it was made from, and a
+# record must point at a fixture that exists with the hash that was checked.
+
+EVIDENCE_VERSION = 1
+EVIDENCE_METHODS = ("structural", "source-checked", "live-read-only", "live-simulation")
+EVIDENCE_LIVE_METHODS = ("live-read-only", "live-simulation")
+EVIDENCE_OUTCOMES = ("matched", "mismatched")
+EVIDENCE_REQUIRED_FIELDS = (
+    "verificationVersion",
+    "fixtureId",
+    "fixtureSha256",
+    "method",
+    "checkedAt",
+    "verifier",
+    "outcome",
+)
+EVIDENCE_OPTIONAL_FIELDS = ("network", "endpointHost", "evidenceRef")
+_EVIDENCE_SHA256_RE = re.compile(r"[0-9a-f]{64}")
+_EVIDENCE_HOST_RE = re.compile(r"[^/:?#@\s\\]+")
+_EVIDENCE_INSTANT_RE = re.compile(
+    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z"
+)
+
+
+def _is_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _non_empty_str(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _check_instant(value: object) -> str | None:
+    """Problem with ``checkedAt``, or None. RFC 3339, UTC, with a ``Z``."""
+    if not isinstance(value, str) or not _EVIDENCE_INSTANT_RE.fullmatch(value):
+        return "checkedAt must be an RFC 3339 UTC instant such as 2026-09-28T12:00:00Z"
+    try:
+        datetime.strptime(value.split(".")[0].rstrip("Z"), "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return f"checkedAt {value!r} is not a real date and time"
+    return None
+
+
+def _check_evidence_ref(value: str) -> str | None:
+    if value.startswith("/") or "\\" in value or "\0" in value:
+        return "evidenceRef must be a relative path inside the repository"
+    if any(part in ("", ".", "..") for part in value.split("/")):
+        return "evidenceRef must not contain empty, '.' or '..' path segments"
+    return None
+
+
+def validate_evidence(record: object) -> list[str]:
+    """Return every problem found in one verification record (CF-04 section 3).
+
+    An empty list means the record is structurally valid. This checks the
+    record on its own; ``check_evidence_against_fixtures`` checks that the
+    fixture it names exists with the hash that was verified. Nothing here
+    decides whether a record is *fresh* (CF-04 section 4); freshness is derived
+    elsewhere and never stored.
+    """
+    if not isinstance(record, dict):
+        return ["a verification record must be a JSON object"]
+
+    problems: list[str] = []
+    allowed = set(EVIDENCE_REQUIRED_FIELDS) | set(EVIDENCE_OPTIONAL_FIELDS)
+    for name in EVIDENCE_REQUIRED_FIELDS:
+        if name not in record:
+            problems.append(f"missing required field {name!r}")
+    for name in sorted(set(record) - allowed):
+        problems.append(
+            f"unknown field {name!r}; allowed fields are "
+            + ", ".join(sorted(allowed))
+        )
+
+    version = record.get("verificationVersion")
+    if "verificationVersion" in record and (not _is_int(version) or version != EVIDENCE_VERSION):
+        problems.append(f"verificationVersion must be {EVIDENCE_VERSION}")
+
+    if "fixtureId" in record and not _non_empty_str(record["fixtureId"]):
+        problems.append("fixtureId must be a non-empty string")
+
+    sha = record.get("fixtureSha256")
+    if "fixtureSha256" in record and not (
+        isinstance(sha, str) and _EVIDENCE_SHA256_RE.fullmatch(sha)
+    ):
+        problems.append("fixtureSha256 must be 64 lowercase hex characters")
+
+    method = record.get("method")
+    if "method" in record and method not in EVIDENCE_METHODS:
+        problems.append(f"method must be one of {list(EVIDENCE_METHODS)}")
+
+    if "checkedAt" in record:
+        instant_problem = _check_instant(record["checkedAt"])
+        if instant_problem:
+            problems.append(instant_problem)
+
+    if "outcome" in record and record["outcome"] not in EVIDENCE_OUTCOMES:
+        problems.append(f"outcome must be one of {list(EVIDENCE_OUTCOMES)}")
+
+    if "verifier" in record:
+        verifier = record["verifier"]
+        if not isinstance(verifier, dict):
+            problems.append("verifier must be an object with name and version")
+        else:
+            for name in ("name", "version"):
+                if not _non_empty_str(verifier.get(name)):
+                    problems.append(f"verifier.{name} must be a non-empty string")
+            for name in sorted(set(verifier) - {"name", "version"}):
+                problems.append(f"unknown field {name!r} in verifier")
+
+    network = record.get("network")
+    if network is not None:
+        if not isinstance(network, dict):
+            problems.append("network must be an object or null")
+        else:
+            if not _non_empty_str(network.get("name")):
+                problems.append("network.name must be a non-empty string")
+            if not _non_empty_str(network.get("passphrase")):
+                problems.append("network.passphrase must be a non-empty string")
+            observed = network.get("observedProtocol")
+            if not _is_int(observed) or observed < 0:
+                problems.append("network.observedProtocol must be a non-negative integer")
+            for name in sorted(set(network) - {"name", "passphrase", "observedProtocol"}):
+                problems.append(f"unknown field {name!r} in network")
+
+    host = record.get("endpointHost")
+    if host is not None and not (isinstance(host, str) and _EVIDENCE_HOST_RE.fullmatch(host)):
+        problems.append(
+            "endpointHost must be a host name only: no scheme, port, path, query, "
+            "credentials or whitespace"
+        )
+
+    reference = record.get("evidenceRef")
+    if reference is not None:
+        if not _non_empty_str(reference):
+            problems.append("evidenceRef must be a non-empty string or null")
+        else:
+            reference_problem = _check_evidence_ref(reference)
+            if reference_problem:
+                problems.append(reference_problem)
+
+    if method in EVIDENCE_LIVE_METHODS:
+        if not isinstance(network, dict):
+            problems.append(f"method {method!r} requires a network object (name, passphrase, observedProtocol)")
+        if host is None:
+            problems.append(f"method {method!r} requires endpointHost")
+        if reference is None:
+            problems.append(
+                f"method {method!r} requires evidenceRef: a live record must point at "
+                "the captured request and response it was made from"
+            )
+    return problems
+
+
+def validate_evidence_file(path: Path, report: Report) -> dict | None:
+    """Parse one evidence file and report its problems. Returns the record."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        report.error(path, f"cannot read the evidence file: {error}")
+        return None
+    try:
+        record = json.loads(text)
+    except json.JSONDecodeError as error:
+        report.error(path, f"not valid JSON: {error}")
+        return None
+    problems = validate_evidence(record)
+    for problem in problems:
+        report.error(path, problem)
+    return record if not problems else None
+
+
+def find_evidence_files(target: Path) -> list[Path]:
+    """``*.json`` files under a directory, or the file itself, sorted."""
+    if target.is_dir():
+        return sorted(p for p in target.rglob("*.json") if p.is_file())
+    return [target]
+
+
+def fixture_hashes(roots: list[Path]) -> dict[str, str]:
+    """``{fixture id: sha256 of the fixture file}`` for every loadable fixture."""
+    hashes: dict[str, str] = {}
+    scratch = Report()
+    for root in roots:
+        for path in find_fixture_files(root):
+            fx = load_fixture(path, scratch)
+            fixture_id = known_fixture_id(fx) if fx is not None else None
+            if fixture_id:
+                hashes.setdefault(fixture_id, hashlib.sha256(path.read_bytes()).hexdigest())
+    return hashes
+
+
+def check_evidence_against_fixtures(
+    path: Path, record: dict, hashes: dict[str, str], report: Report
+) -> None:
+    """The record's fixture must exist, and its hash must be the current one.
+
+    A record whose ``fixtureSha256`` differs from the current file describes an
+    earlier version of the fixture (CF-04 section 4, ``historical``): it is
+    reported so it is never read as evidence for the file that is there now.
+    """
+    fixture_id = record.get("fixtureId")
+    if fixture_id not in hashes:
+        report.error(path, f"fixtureId {fixture_id!r} does not match any fixture")
+    elif hashes[fixture_id] != record.get("fixtureSha256"):
+        report.error(
+            path,
+            f"fixtureSha256 does not match the current {fixture_id!r} fixture file "
+            f"(current {hashes[fixture_id]}); the record describes an earlier version",
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -620,15 +1069,71 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--evidence",
+        action="append",
+        default=[],
+        type=Path,
+        metavar="PATH",
+        help=(
+            "a verification record file, or a directory of *.json records (CF-04); "
+            "may be given more than once. Each record is validated and must name a "
+            "fixture in the scanned roots with the hash that was verified"
+        ),
+    )
+    parser.add_argument(
         "-q",
         "--quiet",
         action="store_true",
         help=(
-            "suppress warning output; errors and the final OK/FAILED summary are "
-            "still printed"
+            "suppress warning output in the text format; errors and the final "
+            "OK/FAILED summary are still printed (JSON output is unaffected)"
+        ),
+    )
+    parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help=(
+            "output format: 'text' (default) is the human-readable report; "
+            "'json' prints one structured JSON document on stdout and nothing "
+            "on stderr"
         ),
     )
     return parser
+
+
+def build_json_report(report: Report, roots: list[Path], total_files: int) -> dict:
+    """The ``--format json`` document (F-023).
+
+    ``valid`` mirrors the exit code: ``True`` when the run would exit 0. Every
+    diagnostic is rendered from the same ``Diagnostic`` record the text report
+    uses, so the two formats cannot disagree. The summary's counts are derived,
+    not maintained separately: ``fixtures`` is the number of ``*.toml`` files
+    discovered across ``roots``, and the error/warning counts are the lengths
+    of the arrays above them.
+    """
+    return {
+        "valid": report.ok,
+        "errors": [entry.as_json() for entry in report.error_entries],
+        "warnings": [entry.as_json() for entry in report.warning_entries],
+        "summary": {
+            "roots": [str(root) for root in roots],
+            "fixtures": total_files,
+            "errors": len(report.error_entries),
+            "warnings": len(report.warning_entries),
+        },
+    }
+
+
+def render_json(document: dict) -> str:
+    """The canonical JSON encoding: two-space indent, one trailing newline.
+
+    ``ensure_ascii=False`` keeps non-ASCII fixture paths and messages readable
+    while ``json.dumps`` still escapes the characters JSON requires (quotes,
+    backslashes, newlines), so the result always round-trips through
+    ``json.loads``.
+    """
+    return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
 
 
 def main(argv: list[str]) -> int:
@@ -647,9 +1152,26 @@ def main(argv: list[str]) -> int:
             combined.error(root, "not a directory")
             continue
         total_files += len(find_fixture_files(root))
-        sub_report = validate_directory(root)
-        combined.errors.extend(sub_report.errors)
-        combined.warnings.extend(sub_report.warnings)
+        combined.merge(validate_directory(root))
+
+    if args.format == "json":
+        # One complete document on stdout and nothing else, so `| jq` and
+        # `json.load` both see valid JSON regardless of whether the run passed.
+        sys.stdout.write(render_json(build_json_report(combined, roots, total_files)))
+        return 0 if combined.ok else 1
+
+    evidence_files: list[Path] = []
+    for target in args.evidence:
+        if not target.exists():
+            combined.error(target, "evidence path does not exist")
+            continue
+        evidence_files.extend(find_evidence_files(target))
+    if evidence_files:
+        hashes = fixture_hashes([r for r in roots if r.is_dir()])
+        for path in evidence_files:
+            record = validate_evidence_file(path, combined)
+            if record is not None:
+                check_evidence_against_fixtures(path, record, hashes, combined)
 
     if not args.quiet:
         for warning in combined.warnings:
@@ -658,7 +1180,10 @@ def main(argv: list[str]) -> int:
         print(f"error: {error}", file=sys.stderr)
 
     if combined.ok:
-        print(f"OK: {total_files} fixture file(s) valid across {len(roots)} root(s)")
+        summary = f"OK: {total_files} fixture file(s) valid across {len(roots)} root(s)"
+        if evidence_files:
+            summary += f"; {len(evidence_files)} evidence record(s) valid"
+        print(summary)
         return 0
     print(f"FAILED: {len(combined.errors)} error(s)", file=sys.stderr)
     return 1
