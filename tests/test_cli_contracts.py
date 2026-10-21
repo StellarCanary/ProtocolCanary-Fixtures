@@ -7,6 +7,7 @@ import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -162,12 +163,20 @@ class CliContractTests(unittest.TestCase):
         p_dir = self.run_tool(tool, str(out_dir))
         self.assertEqual(p_dir.returncode, 2)
 
-        # Corrupted archive file (UnreadableArchive, exit 2)
-        corrupted_tar = Path(self.temp_dir) / "corrupted.tar.gz"
-        corrupted_tar.write_bytes(b"\x1f\x8b\x08" + b"garbage" * 10)
-        p_corrupted = self.run_tool(tool, str(corrupted_tar))
-        self.assertEqual(p_corrupted.returncode, 2)
-        self.assertIn("cannot read the archive", p_corrupted.stderr)
+        # Unreadable archive file (non-gzip, UnreadableArchive, exit 2)
+        unreadable_tar = Path(self.temp_dir) / "unreadable.tar.gz"
+        unreadable_tar.write_bytes(b"not a gzip file at all")
+        p_unreadable = self.run_tool(tool, str(unreadable_tar))
+        self.assertEqual(p_unreadable.returncode, 2)
+        self.assertIn("cannot read the archive", p_unreadable.stderr)
+
+        # Invalid archive missing registry.json (verification failure, exit 1)
+        empty_tar = Path(self.temp_dir) / "empty.tar.gz"
+        with tarfile.open(empty_tar, "w:gz") as tar:
+            pass
+        p_empty = self.run_tool(tool, str(empty_tar))
+        self.assertEqual(p_empty.returncode, 1)
+        self.assertIn("the archive has no registry.json at its root", p_empty.stderr)
 
         # Valid archive
         p_valid = self.run_tool(tool, str(archive_path))
