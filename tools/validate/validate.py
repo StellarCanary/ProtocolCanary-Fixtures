@@ -64,6 +64,18 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.common import pack_limits
+
+# Extraction limits approved under D-06 (CF-02 section 7, CF-06 section 6).
+MAX_FILES = pack_limits.MAX_FILES
+MAX_TOTAL_BYTES = pack_limits.MAX_TOTAL_BYTES
+MAX_FILE_BYTES = pack_limits.MAX_FILE_BYTES
+MAX_DEPTH = pack_limits.MAX_DEPTH
+
 # Mirrors canary-fixtures' supported surfaces; must be kept in sync with
 # docs/fixture-contract.md in the upstream canary-fixtures repo. Changing
 # this without a corresponding upstream change would make the validator accept
@@ -544,7 +556,17 @@ def check_source_reference(value: str) -> str | None:
 
 
 def find_fixture_files(root: Path) -> list[Path]:
-    return sorted(p for p in root.rglob("*.toml") if p.is_file())
+    fixtures = []
+    for p in root.rglob("*.toml"):
+        if not p.is_file():
+            continue
+        try:
+            if ".git" in p.relative_to(root).parts:
+                continue
+        except ValueError:
+            continue
+        fixtures.append(p)
+    return sorted(fixtures)
 
 
 def _toml_error_line(exc: tomllib.TOMLDecodeError) -> int | None:
@@ -567,12 +589,18 @@ def _field_line(path: Path, key: str) -> int | None:
 
     Only used for fields the validator has already found must exist (so the
     key is a top-level fixture field, not an arbitrary needle). ``None`` is
-    returned when the file cannot be read or the key is not defined exactly
-    once -- for example it also appears in a comment -- because pointing at the
-    wrong line would mislead more than omitting the line does.
+    returned when the file cannot be read, exceeds the pack file size limit,
+    or the key is not defined exactly once -- for example it also appears in a
+    comment -- because pointing at the wrong line would mislead more than
+    omitting the line does.
     """
     try:
-        text = path.read_text(encoding="utf-8")
+        if path.stat().st_size > pack_limits.MAX_FILE_BYTES:
+            return None
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            text = f.read(pack_limits.MAX_FILE_BYTES + 1)
+        if len(text.encode("utf-8", errors="replace")) > pack_limits.MAX_FILE_BYTES:
+            return None
     except OSError:
         return None
     pattern = re.compile(rf"^[ \t]*{re.escape(key)}[ \t]*=")
@@ -652,13 +680,58 @@ def report_out_of_range_integers(path: Path, data: dict, report: Report) -> bool
     return reported
 
 
-def load_fixture(path: Path, report: Report) -> Fixture | None:
-    # Read raw bytes rather than through read_text so the UnicodeDecodeError
-    # below carries whole-file offsets (issue #341, row 1).
+def load_fixture(path: Path, report: Report, root: Path | None = None) -> Fixture | None:
     try:
-        raw_bytes = path.read_bytes()
+        st = path.stat()
+        file_size = st.st_size
+    except OSError as exc:
+        try:
+            path.read_bytes()
+        except OSError as read_exc:
+            report.error(path, f"failed to read file: {read_exc}")
+            return None
+        report.error(path, f"failed to read file: {exc}")
+        return None
+
+    rel = None
+    if root is not None:
+        try:
+            rel = path.relative_to(root).as_posix()
+        except ValueError:
+            pass
+    if rel is None:
+        for parent in path.parents:
+            if parent.name.startswith("protocol-"):
+                try:
+                    rel = path.relative_to(parent).as_posix()
+                    break
+                except ValueError:
+                    pass
+    if rel is None:
+        rel = path.name
+
+    if file_size > pack_limits.MAX_FILE_BYTES:
+        report.error(
+            path,
+            f"{rel} is {file_size} bytes, over the {pack_limits.MAX_FILE_BYTES} byte limit for one pack file",
+        )
+        return None
+
+    # Read raw bytes with a bounded read rather than reading the entire file
+    # into memory, enforcing MAX_FILE_BYTES even if the file grew after stat().
+    try:
+        with open(path, "rb") as f:
+            raw_bytes = f.read(pack_limits.MAX_FILE_BYTES + 1)
     except OSError as exc:
         report.error(path, f"failed to read file: {exc}")
+        return None
+
+    if len(raw_bytes) > pack_limits.MAX_FILE_BYTES:
+        size = max(len(raw_bytes), path.stat().st_size)
+        report.error(
+            path,
+            f"{rel} is {size} bytes, over the {pack_limits.MAX_FILE_BYTES} byte limit for one pack file",
+        )
         return None
     try:
         raw = raw_bytes.decode("utf-8")
@@ -1618,10 +1691,77 @@ def validate_directory(root: Path, seen_ids: dict[str, Path] | None = None) -> R
     report = Report()
     fixtures: list[Fixture] = []
     check_portable_paths(root, report)
+
+    # Collect pack members per CF-02 section 2 and enforce limits.
+    pack_members: set[Path] = set()
+    limit_plus_one = pack_limits.MAX_FILES + 1
+
+    toml_files: list[Path] = []
     for path in find_fixture_files(root):
-        fx = load_fixture(path, report)
+        toml_files.append(path)
+        pack_members.add(path)
+        if len(toml_files) >= limit_plus_one:
+            break
+
+    for path in toml_files:
+        try:
+            rel = path.relative_to(root).as_posix()
+        except ValueError:
+            rel = path.name
+        if len(rel.split("/")) > pack_limits.MAX_DEPTH:
+            report.error(path, f"{rel} is deeper than {pack_limits.MAX_DEPTH} path segments")
+
+        fx = load_fixture(path, report, root=root)
         if fx is not None:
             fixtures.append(fx)
+
+    # Check payload files referenced by input_file or expected_file
+    for fx in fixtures:
+        for file_field in ("input_file", "expected_file"):
+            if file_field in fx.data:
+                val = fx.data[file_field]
+                if isinstance(val, str) and val:
+                    referenced = (fx.path.parent / val).resolve()
+                    if referenced.is_file():
+                        pack_members.add(referenced)
+                        try:
+                            rel_payload = referenced.relative_to(root.resolve()).as_posix()
+                        except ValueError:
+                            rel_payload = referenced.name
+                        if len(rel_payload.split("/")) > pack_limits.MAX_DEPTH:
+                            report.error(
+                                referenced,
+                                f"{rel_payload} is deeper than {pack_limits.MAX_DEPTH} path segments",
+                            )
+                        try:
+                            st = referenced.stat()
+                            if st.st_size > pack_limits.MAX_FILE_BYTES:
+                                report.error(
+                                    referenced,
+                                    f"{rel_payload} is {st.st_size} bytes, over the {pack_limits.MAX_FILE_BYTES} byte limit for one pack file",
+                                )
+                        except OSError as exc:
+                            report.error(referenced, f"failed to read file: {exc}")
+
+    # Enforce count and total size limits per root
+    if len(pack_members) > pack_limits.MAX_FILES:
+        report.error(
+            root,
+            f"{root} has {len(pack_members)} pack files, over the {pack_limits.MAX_FILES} file limit",
+        )
+
+    total_bytes = 0
+    for p in pack_members:
+        try:
+            total_bytes += p.stat().st_size
+        except OSError:
+            pass
+
+    if total_bytes > pack_limits.MAX_TOTAL_BYTES:
+        report.error(
+            root,
+            f"{root} is {total_bytes} bytes, over the {pack_limits.MAX_TOTAL_BYTES} byte limit for one pack",
+        )
 
     for fx in fixtures:
         report.register_fixture_id(fx.path, known_fixture_id(fx))

@@ -12,6 +12,30 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- `tools/common/pack_limits.py`: Shared pack extraction limits approved under decision
+  D-06 (CF-02 section 7, CF-06 section 6: 2,000 files, 16 MiB total uncompressed, 1 MiB per file,
+  path depth 8) shared between `validate.py`, `generate.py`, and `pack.py`. `tools/validate/validate.py`
+  enforces all four limits with bounded reads (`read(limit + 1)`) and `stat()` bounds for pack
+  members (CF-02 section 2), reporting violations with pack-relative paths and limits.
+  `tools/registry/generate.py`'s depth check is aligned to count all path segments including the
+  file name, matching the engine and `pack.py`. Closes
+  [issue #369](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/369).
+- `tools/scaffold/new_fixture.py`: Fixture scaffolding CLI tool that generates template fixtures
+  with five required header sections and explicit `TODO` placeholders for missing evidence/results,
+  intentionally failing `tools/validate/validate.py` until filled in. Closes
+  [issue #353](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/353).
+- `docs/tools.md`: Comprehensive documentation of the command-line behaviors, options, observed
+  exit codes, and output streams for all repository tools (`pack.py`, `verify_archive.py`, `generate.py`,
+  `manifest.py`, `badge.py`, `validate.py`, `schema_sync.py`), including an observations section for
+  existing CLI inconsistencies tested in `tests/test_cli_contracts.py`. Closes
+  [issue #351](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/351).
+- `tests/xdr_codec.py`: Independent pure-Python RFC 4506 XDR codec for `StellarValue` (including
+  basic, signed, and CAP-0083 empty-tx-set) and `ContractExecutable` (including wasm, stellar-asset,
+  and CAP-0085 external-ref), citing `stellar/stellar-xdr` v28.0 (commit `9c9c145953e80990d6ff1ae3a6a973a0ce6d0694`).
+  `tests/test_pack_xdr_independent.py` cross-checks all pack fixtures, ensuring roundtrip bit-identity
+  and verifying structural decode failures. Closes
+  [issue #348](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/348).
+
 - `tools/validate/validate.py` validates Soroban `source_account` and
   `contract_id` with a standard-library-only strkey decoder (RFC 4648 unpadded base32,
   CRC16-XModem checksum, G.../C... version byte) and requires `function` to

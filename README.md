@@ -106,6 +106,9 @@ release tags, commits and the network passphrases) is in
 [`docs/upstream-matrix.md`](docs/upstream-matrix.md); the same information as
 data is in [`upstream-matrix.json`](upstream-matrix.json).
 
+The command-line behavior, exit codes, and output streams of repository tools
+are documented in [`docs/tools.md`](docs/tools.md).
+
 ## Protocol packs
 
 | Pack | Status | Notes |

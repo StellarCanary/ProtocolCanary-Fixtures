@@ -21,7 +21,8 @@ To add one:
   comment explaining how the expected value was derived.
 - **Write it** — stable, repository-unique `p<protocol>-<surface>-<slug>` ID;
   deterministic input; an explicit expected result using the surface's typed
-  assertion vocabulary.
+  assertion vocabulary. Use `python3 tools/scaffold/new_fixture.py` to generate
+  a skeleton template with explicit `TODO` placeholders.
 - **Check it** — run `make validate` (or `python3 tools/validate/validate.py` directly).
 - **Document, test & refresh it** — update the relevant `docs/protocol-NN.md`
   table (and the pack's `README.md` for a new CAP or surface), run
@@ -67,7 +68,11 @@ near a day boundary ambiguous by up to a day, defeating that purpose.
    `*.toml` files under a given `--fixtures-dir`, not just one file), and
    never renamed just because an implementation detail changed — if the
    semantic assertion itself changes, add a new fixture ID instead of
-   silently repurposing an old one.
+   silently repurposing an old one. To scaffold a skeleton fixture with the
+   required five-section header comment and explicit placeholders, run
+   `python3 tools/scaffold/new_fixture.py --surface <surface> --protocol <N> --id <id> --category <cat>`.
+   The generated skeleton intentionally fails validation until every placeholder
+   is replaced with verified evidence.
 4. **Create deterministic input.** No fixture may depend on ledger state
    that changes between runs (a current ledger sequence, "the latest
    anything") unless the assertion is explicitly scoped as a live-network
@@ -334,6 +339,26 @@ rules therefore apply to every change:
 Both rules are repository contracts, not style advice: a fixture that breaks
 one fails `make validate` (and therefore CI), and the archive and registry
 tools reject the pack before it can be released.
+
+## Pack limits
+
+Fixture packs are subject to extraction limits approved under decision D-06
+(CF-02 section 7 and CF-06 section 6 in `Protocol-Canary`), enforced
+identically by `tools/validate/validate.py`, `tools/registry/generate.py`,
+and `tools/pack/pack.py`:
+
+- **File count**: at most 2,000 member files per pack.
+- **Total uncompressed size**: at most 16 MiB (16,777,216 bytes) across all
+  pack members.
+- **Per-file size**: at most 1 MiB (1,048,576 bytes) for any individual pack
+  member.
+- **Path depth**: at most 8 `/`-separated segments for any member path relative
+  to the pack root (including the file name).
+
+Pack members are defined by CF-02 section 2: every `*.toml` file (excluding
+anything under `.git`), plus every payload file referenced by `input_file` or
+`expected_file`. Non-member files (such as `README.md`) are outside the pack
+and do not count toward these limits during validation.
 
 ## Deprecating a fixture
 

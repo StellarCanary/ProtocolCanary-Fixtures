@@ -54,6 +54,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.common import pack_limits
+
 SCHEMA_PATH = REPO_ROOT / "schemas" / "registry-v1.schema.json"
 DEFAULT_REGISTRY_NAME = "registry-v1.json"
 
@@ -63,10 +68,10 @@ SURFACES = ("xdr", "rpc", "soroban")
 PAYLOAD_FIELDS = ("input_file", "expected_file")
 
 # Extraction limits approved under D-06 (CF-02 section 7, CF-06 section 6).
-MAX_FILES = 2000
-MAX_TOTAL_BYTES = 16 * 1024 * 1024
-MAX_FILE_BYTES = 1024 * 1024
-MAX_DEPTH = 8
+MAX_FILES = pack_limits.MAX_FILES
+MAX_TOTAL_BYTES = pack_limits.MAX_TOTAL_BYTES
+MAX_FILE_BYTES = pack_limits.MAX_FILE_BYTES
+MAX_DEPTH = pack_limits.MAX_DEPTH
 
 
 class PackError(Exception):
@@ -131,8 +136,8 @@ def check_pack_path(path: str) -> None:
     for char in path:
         if char == "\x00" or unicodedata.category(char) == "Cc":
             raise PackError(f"pack path {path!r} contains a control character")
-    if len(segments) - 1 > MAX_DEPTH:
-        raise PackError(f"pack path {path!r} is nested deeper than {MAX_DEPTH} directories")
+    if len(segments) > MAX_DEPTH:
+        raise PackError(f"pack path {path!r} is deeper than {MAX_DEPTH} path segments")
 
 
 def check_reference(value: str) -> None:
