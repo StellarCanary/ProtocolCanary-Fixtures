@@ -256,24 +256,28 @@ Generates or checks the dynamic fixture-count shield badge in `README.md`.
 ### Synopsis
 
 ```bash
-python3 tools/badge/badge.py [--check]
+python3 tools/badge/badge.py [-h] [--check]
 ```
 
 ### Options
 
+- `-h`, `--help`: show this help message and exit without modifying `README.md`
 - `--check`: verify that the badge count in `README.md` is current without modifying the file; exits non-zero if stale.
+
+Any other argument is a command-line error: usage is printed to stderr and the tool exits 2 without touching `README.md` (issue #392).
 
 ### Exit Codes
 
 | Exit Code | Meaning |
 |---|---|
-| `0` | Success: badge updated or already current. When called without `--check`, exits 0 even if arbitrary arguments or nonexistent paths are passed. |
+| `0` | Success: badge updated or already current, or `--help` requested. |
 | `1` | Under `--check`: badge in `README.md` is stale. Also returned if `README.md` cannot be read or markers are missing. |
+| `2` | Command-line syntax error: unrecognized arguments (usage printed to stderr; `README.md` is not modified). |
 
 ### Output Streams
 
-- **stdout**: Success and status messages (`OK: README.md fixtures badge ...`).
-- **stderr**: Error message when the badge is stale or file read fails.
+- **stdout**: Success and status messages (`OK: README.md fixtures badge ...`); help text on `--help`.
+- **stderr**: Error message when the badge is stale or file read fails; usage on a command-line syntax error.
 
 ---
 
@@ -316,25 +320,27 @@ Verifies that `schemas/fixture-v1.schema.json` mirrors the constants in `tools/v
 ### Synopsis
 
 ```bash
-python3 tools/validate/schema_sync.py
+python3 tools/validate/schema_sync.py [-h]
 ```
 
 ### Options
 
-- None. The tool takes no arguments.
+- `-h`, `--help`: show this help message and exit.
+
+Without arguments the tool performs the sync check.
 
 ### Exit Codes
 
 | Exit Code | Meaning |
 |---|---|
-| `0` | Success: schema matches validator constants. |
+| `0` | Success: schema matches validator constants; or `--help` requested. |
 | `1` | Schema drift: one or more discrepancies found between schema and validator. |
-| `2` | Any argument provided (including `--help` or arbitrary paths). |
+| `2` | Command-line syntax error: any argument other than `-h`/`--help` (usage printed to stderr). |
 
 ### Output Streams
 
-- **stdout**: `OK: schemas/fixture-v1.schema.json matches tools/validate/validate.py` on success.
-- **stderr**: Drift errors and summary on failure; usage message if any argument is supplied.
+- **stdout**: `OK: schemas/fixture-v1.schema.json matches tools/validate/validate.py` on success; help text on `--help`.
+- **stderr**: Drift errors and summary on failure; usage on a command-line syntax error.
 
 ---
 
