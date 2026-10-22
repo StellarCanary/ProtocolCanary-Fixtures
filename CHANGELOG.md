@@ -12,6 +12,13 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- `tools/validate/validate.py` and `schemas/fixture-v1.schema.json`: accept
+  the lookup and paged RPC methods (`get-ledger-entries`, `get-transaction`,
+  `get-ledgers`, `get-transactions`, `get-events`) alongside `get-network`
+  and `get-latest-ledger`, and enforce `[request]` table validation according
+  to CA-01-K. Closes
+  [issue #326](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/326).
+
 - `tools/pack/archive_digests.py` and `.github/workflows/archive-baseline.yml`:
   a cross-platform baseline for the pack archive (issue #365). Every cell of
   the platform and Python-version matrix builds the `protocol-28` archive with a
