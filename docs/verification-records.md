@@ -39,7 +39,7 @@ checks needs a decision of its own. This repository therefore:
 
 ## 2. What the Protocol 28 records say
 
-Twenty-three records, one for each fixture of the `protocol-28` pack. Every
+Thirty-one records, one for each fixture of the `protocol-28` pack. Every
 one of them is a **structural** record:
 
 ```json
@@ -48,10 +48,10 @@ one of them is a **structural** record:
   "fixtureId": "p28-rpc-network",
   "fixtureSha256": "cd53626db9d7a130e678f90d7d32545c23c95895cc0eb3de71e44cd82fc9596d",
   "method": "structural",
-  "checkedAt": "2026-10-22T00:46:37Z",
+  "checkedAt": "2026-10-22T06:44:39Z",
   "verifier": {
     "name": "protocolcanary-fixtures-validate",
-    "version": "ff61db29547a079adf718988a9636a9d691f5cfa"
+    "version": "eb90c66ca49451d6d672397bb0dd6e64de580db1"
   },
   "outcome": "matched",
   "evidenceRef": null
@@ -75,7 +75,7 @@ The check that produced them is the one the CI runs, and it was actually run:
 
 ```console
 $ python3 tools/evidence/record_structural.py protocol-28
-OK: wrote 23 record(s) at 2026-10-22T00:46:37Z
+OK: wrote 31 record(s) at 2026-10-22T06:44:39Z
   protocol-28/evidence/records/p28-rpc-latest-ledger.json
   protocol-28/evidence/records/p28-rpc-network.json
   ...
@@ -113,7 +113,7 @@ The validator accepts them, and the CI checks that it does:
 
 ```console
 $ python3 tools/validate/validate.py --evidence protocol-28/evidence/records
-OK: 23 fixture file(s) valid across 3 root(s); 23 evidence record(s) valid
+OK: 31 fixture file(s) valid across 3 root(s); 31 evidence record(s) valid
 ```
 
 `tests/test_verification_records.py` pins the rules above down: every fixture
