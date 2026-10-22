@@ -269,12 +269,21 @@ class CliContractTests(unittest.TestCase):
         p_check = self.run_tool(tool, "--check")
         self.assertEqual(p_check.returncode, 0)
 
-        # Observed inconsistency: badge.py ignores unknown/extra args and --help
+        # --help prints usage and exits 0 without touching README.md
+        # (issue #392; the old behaviour of ignoring --help is gone)
+        readme = Path(__file__).resolve().parent.parent / "README.md"
+        before = readme.read_bytes()
         p_help = self.run_tool(tool, "--help")
         self.assertEqual(p_help.returncode, 0)
+        self.assertIn("usage: badge.py", p_help.stdout)
+        self.assertEqual(readme.read_bytes(), before)
 
+        # An unknown argument prints usage to stderr and exits 2 without
+        # touching README.md (issue #392)
         p_extra = self.run_tool(tool, "nonexistent_path_xyz")
-        self.assertEqual(p_extra.returncode, 0)
+        self.assertEqual(p_extra.returncode, 2)
+        self.assertIn("usage: badge.py", p_extra.stderr)
+        self.assertEqual(readme.read_bytes(), before)
 
     # 6. tools/validate/validate.py
     def test_validate_cli(self) -> None:
@@ -311,10 +320,11 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(p_noargs.returncode, 0)
         self.assertIn("OK: schemas/fixture-v1.schema.json matches", p_noargs.stdout)
 
-        # Observed inconsistency: --help treated as unexpected arg, exits 2
+        # --help prints usage and exits 0 (issue #392; the old behaviour of
+        # treating --help as an unexpected argument is gone)
         p_help = self.run_tool(tool, "--help")
-        self.assertEqual(p_help.returncode, 2)
-        self.assertIn("usage: schema_sync.py", p_help.stderr)
+        self.assertEqual(p_help.returncode, 0)
+        self.assertIn("usage: schema_sync.py", p_help.stdout)
 
         # Any extra arg exits 2
         p_extra = self.run_tool(tool, "extra_arg")
