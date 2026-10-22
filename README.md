@@ -219,7 +219,9 @@ an upstream XDR definition, or an official release/API reference — and
 carries a header comment explaining what was verified, how, and (for
 anything involving a live network call) when and against which endpoint.
 No fixture asserts a value that isn't traceable to an authoritative
-upstream source; see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+upstream source; see [`CONTRIBUTING.md`](CONTRIBUTING.md). The full procedure
+for packaging, verifying, attesting, and publishing a pack release is documented
+in [`docs/releasing.md`](docs/releasing.md).
 
 ## Validation
 
