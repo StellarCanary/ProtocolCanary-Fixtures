@@ -94,6 +94,12 @@ jobs:
     # Cross-platform and multi-Python matrix (issue #330). Validates that
     # the fixture pack, tooling, and test suite remain fully compatible across
     # Windows, macOS, and newer Python versions (3.12, 3.13).
+    #
+    # While the primary `validate` job pins Python 3.11.16 on ubuntu-latest,
+    # CPython 3.11.10+ is in source-only security-fix status; actions/python-versions
+    # does not build Windows or macOS installer binaries for 3.11.16. "3.11"
+    # is used for windows-latest and macos-latest so setup-python resolves to
+    # the latest available prebuilt 3.11 binary on those platforms.
     if: github.event_name != 'schedule'
     runs-on: ${{ matrix.os }}
     strategy:
@@ -101,9 +107,9 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            python-version: "3.11.16"
+            python-version: "3.11"
           - os: macos-latest
-            python-version: "3.11.16"
+            python-version: "3.11"
           - os: ubuntu-latest
             python-version: "3.12"
           - os: ubuntu-latest

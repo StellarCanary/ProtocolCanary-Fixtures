@@ -599,10 +599,15 @@ and the single-platform branch coverage job, CI (`.github/workflows/validate.yml
 runs a cross-platform and multi-Python validation matrix (`validate-matrix`)
 covering:
 
-- `windows-latest` with Python `3.11.16`
-- `macos-latest` with Python `3.11.16`
+- `windows-latest` with Python `3.11`
+- `macos-latest` with Python `3.11`
 - `ubuntu-latest` with Python `3.12`
 - `ubuntu-latest` with Python `3.13`
+
+(On Windows and macOS, `"3.11"` floats to the latest available prebuilt 3.11
+binary because CPython 3.11.10+ is in source-only security-fix status and
+`actions/python-versions` only publishes prebuilt binaries for Ubuntu at
+3.11.16).
 
 Each matrix cell runs the same validation suite as the primary job:
 structural fixture validation, verification record checks, fixture-count badge
