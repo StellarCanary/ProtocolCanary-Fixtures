@@ -24,6 +24,35 @@ discussion and diff. New entries must include that link; see
   to CA-01-K. Closes
   [issue #326](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/326).
 
+- Eleven `protocol-28/xdr/ledger-entry/` fixtures covering the ledger-entry arms
+  that matter to the protocol: `ACCOUNT`, `TRUSTLINE`, `CONTRACT_DATA`,
+  `CONTRACT_CODE` and `TTL`, each with a roundtrip and at least one
+  decode-failure fixture (six in total: four end-of-structure truncations, a
+  contract-code blob cut inside its length prefix, and a trustline whose
+  `TrustLineAsset` discriminant is changed from `ASSET_TYPE_CREDIT_ALPHANUM4`
+  to the undefined value 9). Every payload was produced by the official
+  `stellar-xdr` 28.0.1 crate (features `base64`, `alloc` — `rustc 1.99.1`,
+  generated 2026-10-22 UTC) through a recorded construction expression, never
+  hand-assembled; the same program asserted that `from_xdr_base64` round-trips
+  each valid entry and rejects each invalid one (`failed to fill whole buffer`
+  for the five truncations, `xdr value invalid` for the undefined asset type).
+  Every id, hash, key and balance is a synthetic structural value: the account
+  ids, issuer, contract id, code hash and TTL key hash are fixed placeholders,
+  the contract-code bytes are the four-byte WebAssembly magic used only to
+  exercise the opaque path and are not a WASM module, `example.test` is a
+  documentation domain, and no secret key appears anywhere. Each header cites
+  `Stellar-ledger-entries.x` at `stellar/stellar-xdr` v28.0 (commit
+  `9c9c145`) with file and line ranges, including the extension unions. The
+  independent standard-library codec in `tests/xdr_codec.py` was extended with
+  the five arms and checks all eleven fixtures (5 roundtrips byte-for-byte, 6
+  rejected). All eleven pass `tools/validate/validate.py` and the engine
+  offline (`stellar-canary 0.2.0`, `Protocol-Canary` commit `bc13306`): 5
+  round-trips byte-for-byte, 6 correctly rejected. The pack's CF-04 structural
+  records were regenerated, so `protocol-28/evidence/records/` holds one record
+  per fixture (42). Closes
+  [issue #363](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/363).
+  ([PR #444])
+
 - `tools/pack/archive_digests.py` and `.github/workflows/archive-baseline.yml`:
   a cross-platform baseline for the pack archive (issue #365). Every cell of
   the platform and Python-version matrix builds the `protocol-28` archive with a
@@ -735,3 +764,4 @@ discussion and diff. New entries must include that link; see
 [PR #433]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/433
 [PR #432]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/432
 [PR #431]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/431
+[PR #444]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/444

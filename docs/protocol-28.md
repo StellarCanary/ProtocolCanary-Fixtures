@@ -676,6 +676,87 @@ but the Soroban simulation fixture still calls the configured endpoint.
 Protocol 29 coverage is developed separately and only from real evidence; see
 [`protocol-29-rpc-observations.md`](protocol-29-rpc-observations.md).
 
+## Ledger entries
+
+Added 2026-10-22. Ledger entries are the data the network stores, and their
+encodings change whenever a protocol adds a field — which is exactly why each
+entry arm needs its own fixture: a decoder that drifts on one arm can keep
+every other arm passing.
+
+**What this pack tests.** Eleven fixtures under
+[`protocol-28/xdr/ledger-entry/`](../protocol-28/xdr/ledger-entry/), one
+roundtrip and at least one decode-failure per arm:
+
+| Arm | Roundtrip | Decode failure |
+|---|---|---|
+| `ACCOUNT` (0) | `p28-xdr-ledger-entry-account` | `-account-truncated` |
+| `TRUSTLINE` (1) | `p28-xdr-ledger-entry-trustline` | `-trustline-truncated`, `-trustline-unknown-asset-type` |
+| `CONTRACT_DATA` (6) | `p28-xdr-ledger-entry-contract-data` | `-contract-data-key-truncated` |
+| `CONTRACT_CODE` (7) | `p28-xdr-ledger-entry-contract-code` | `-contract-code-truncated` |
+| `TTL` (9) | `p28-xdr-ledger-entry-ttl` | `-ttl-missing-live-until` |
+
+The truncations remove bytes from the end of a crate-produced entry: the
+entry-level ext discriminant for the account and trustline arms, the final
+`liveUntilLedgerSeq` for TTL, two bytes of the code blob for contract code,
+and everything after the key for contract data. `-trustline-unknown-asset-type`
+changes one field instead: the `TrustLineAsset` discriminant is set from
+`ASSET_TYPE_CREDIT_ALPHANUM4` (1) to 9, which `enum AssetType` does not define.
+
+**Where the definitions come from.** Every header cites
+`Stellar-ledger-entries.x` in `stellar/stellar-xdr` at tag `v28.0`, commit
+`9c9c145953e80990d6ff1ae3a6a973a0ce6d0694`:
+
+- `enum LedgerEntryType` lines 92-104 and `struct LedgerEntry` lines 548-586,
+  including the data union (552-573) and the ext union (575-585);
+- `struct AccountEntry` lines 190-217 with its inline ext union (206-216),
+  `struct Signer` lines 106-110, `typedef string string32<32>` line 13 and
+  `typedef opaque Thresholds[4]` line 12;
+- `struct TrustLineEntry` lines 276-307, `union TrustLineAsset` lines 247-262,
+  `enum AssetType` lines 24-30 and `struct AlphaNum4` lines 43-47;
+- `struct ContractDataEntry` lines 490-497 and `enum ContractDataDurability`
+  lines 485-488, with `union SCAddress` (Stellar-contract.x 206-222) and
+  `union SCVal` (Stellar-contract.x 254-316) nested inside;
+- `struct ContractCodeEntry` lines 513-528, including its inline ext union and
+  the `opaque code<>` field;
+- `struct TTLEntry` lines 530-534;
+- `typedef PublicKey AccountID` (`Stellar-types.x` line 85) and
+  `typedef opaque Hash[32]` (line 8).
+
+The extension unions are cited explicitly because they are where a protocol
+adds fields. Every fixture here uses the V0 arm; a decoder that mishandled the
+ext discriminant would fail on the truncation fixtures, which remove exactly
+those four bytes.
+
+**How the payloads were produced.** Every `value_base64` is the output of a
+Rust program that builds the typed value with the official `stellar-xdr`
+28.0.1 crate (features `base64` and `alloc`) and calls
+`to_xdr_base64(Limits::none())`; nothing is hand-assembled. Each header records
+the construction expression, the crate version, `rustc 1.99.1 (58cf8f9c3
+2026-10-13)` and the generation date (2026-10-22 UTC). The same program
+asserted that `from_xdr_base64` round-trips every valid entry and rejects every
+decode-failure value with the error the header quotes (`failed to fill whole
+buffer` for the five truncations, `xdr value invalid` for the undefined asset
+type).
+
+Every id, hash, key and balance is a synthetic structural value. The
+0x11/0x33-filled account ids are not accounts, the 0x44-filled issuer is not
+an issuer, the 0x22-filled contract id is not a deployed contract, the
+0x55-filled code hash is not the hash of any upload, and the four contract-code
+bytes (`00 61 73 6d`) are the WebAssembly magic prefix used only to exercise
+the opaque path — they are not a WASM module. `example.test` is a
+documentation domain. No secret key is used anywhere, and no fixture claims a
+network observation.
+
+**Verification.** `tools/validate/validate.py` accepts all 11 fixtures. The
+independent standard-library LedgerEntry codec in `tests/xdr_codec.py` (added
+with these fixtures) decodes and re-encodes all five roundtrips byte-for-byte
+and rejects all six decode-failures. With the engine: `stellar-canary` 0.2.0,
+`Protocol-Canary` main at commit
+`bc1330660c36eb67a87747513c7d14ba04d39238`, run offline with `--offline
+--no-cache --json` from a project whose `.stellar-canary.toml` enables
+`xdr = true`, reports all 11 as passing — 5 "LedgerEntry round-tripped
+byte-for-byte" and 6 "LedgerEntry was correctly rejected".
+
 ## Consuming this pack
 
 For a concise index of the fixtures in this pack, see [`protocol-28/README.md`](../protocol-28/README.md).
