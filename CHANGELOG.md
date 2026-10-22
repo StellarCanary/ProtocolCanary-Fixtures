@@ -57,6 +57,37 @@ discussion and diff. New entries must include that link; see
   and the validate workflow now checks them. Closes
   [issue #366](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/366).
   ([PR #424])
+- Eight `protocol-28/xdr/transaction-envelope/` fixtures covering every arm of the
+  `TransactionEnvelope` union, which the pack previously had no evidence for:
+  `p28-xdr-transaction-envelope-v0-roundtrip` and
+  `p28-xdr-transaction-envelope-v0-decode-failure` (the `ENVELOPE_TYPE_TX_V0` arm),
+  `p28-xdr-transaction-envelope-v1-roundtrip` and
+  `p28-xdr-transaction-envelope-v1-decode-failure` (the `ENVELOPE_TYPE_TX` arm),
+  `p28-xdr-transaction-envelope-soroban-invoke-roundtrip` and
+  `p28-xdr-transaction-envelope-soroban-invoke-decode-failure` (a v1 envelope whose single
+  operation is `INVOKE_HOST_FUNCTION`) and
+  `p28-xdr-transaction-envelope-fee-bump-roundtrip` and
+  `p28-xdr-transaction-envelope-fee-bump-decode-failure` (the `ENVELOPE_TYPE_TX_FEE_BUMP`
+  arm). Every payload was produced by the official `stellar-xdr` 28.0.1 crate
+  (features `base64`, `alloc` — `rustc 1.99.1`, generated 2026-10-22 UTC) via a recorded
+  construction expression, never hand-assembled; the four decode-failure payloads are
+  documented mutations of those crate-produced values (three truncations — 150 of 212, 100 of
+  244 and 130 of 328 bytes — and one envelope-type discriminant changed to an undefined
+  value) that the same crate's `from_xdr_base64` rejects with `failed to fill whole buffer`
+  or `xdr value invalid`. The source accounts, payment destinations, contract id, signature
+  hints and signatures are labelled synthetic structural values in the headers, no secret
+  key is used anywhere, no fixture claims a network observation or a submitted transaction,
+  and each header cites `Stellar-transaction.x` (plus the ledger-entries, types and contract
+  files) at `stellar/stellar-xdr` v28.0 (commit `9c9c145`) with file and line ranges. All
+  eight pass the engine offline (`stellar-canary 0.2.0`, `Protocol-Canary` commit
+  `bc13306`): the four roundtrips byte-for-byte, the four decode-failures because the
+  engine rejects the value. Eight CF-04 structural verification records were added for
+  the new fixtures with `tools/evidence/record_structural.py`, and the pack's records
+  were regenerated, so `protocol-28/evidence/records/` holds one record per fixture
+  (31). Closes
+  [issue #362](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/362).
+  ([PR #434])
+
 - `tools/registry/diff.py`: Compares two fixture registries and reports which fixtures were
   added, removed or changed — the same id with a different file hash — so a pack release can
   be described from the registry data instead of by hand from `git log`. The output is three
