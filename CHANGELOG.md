@@ -12,12 +12,41 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
-- `tools/registry/generate.py`: added `--allow-empty` and `--protocol N` flags to
-  support explicitly controlled empty-baseline registry generation (issue #370).
-  Normal non-empty packs continue to require fixtures and reject empty directories
-  unless explicitly controlled, generating the canonical empty baseline registry
-  for protocol 29 byte-for-byte. Closes
-  [issue #370](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/370).
+- Fourteen `protocol-28/xdr/scval-composite/` fixtures covering the composite
+  and address `ScVal` variants: `Vec` absent, present-but-empty, one element and
+  three heterogeneous elements; `Map` empty, one entry, three entries, one
+  level of map-in-vec nesting, and an encoding with non-ascending keys; and
+  `Address` in both the account and contract arms. Three decode-failure
+  fixtures complete the set: a vec whose count exceeds its data, a map cut
+  after its key, and an address with an undefined `SCAddressType`. The vec and
+  map fixtures pin the optional-pointer distinction (`SCVec *`/`SCMap *`), so
+  an absent container and a present-but-empty one are shown to be different
+  encodings. The non-ascending map records an observation: the pinned crate's
+  `from_xdr_base64` accepted it and re-encoded it unchanged, and the engine
+  passed it offline, so neither enforces ascending entry order on decode at
+  these versions. Every payload was produced by the official `stellar-xdr`
+  28.0.1 crate (features `base64`, `alloc` — `rustc 1.99.1`, generated
+  2026-10-22 UTC) through a recorded construction expression, never
+  hand-assembled; the three invalid payloads are documented mutations of
+  crate-produced values that the same crate rejects (`failed to fill whole
+  buffer` twice, `xdr value invalid` once). Address bytes are labelled
+  synthetic structural values — 0x11-filled is not a real account key and
+  0x22-filled is not a real contract id — and no fixture targets a depth limit
+  (open #303). Every header cites `Stellar-contract.x` and `Stellar-types.x`
+  at `stellar/stellar-xdr` v28.0 (commit `9c9c145`) with file and line ranges.
+  All 14 pass `tools/validate/validate.py` and agree with `tests/scval_xdr.py`
+  (11 roundtrips byte-for-byte, 3 rejected), and all 14 pass the engine offline
+  (`stellar-canary 0.2.0`, `Protocol-Canary` commit `bc13306`). The pack's
+  CF-04 structural records were regenerated, so `protocol-28/evidence/records/`
+  holds one record per fixture. Closes
+  [issue #361](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/361).
+  ([PR #440])
+
+- `docs/releasing.md`: comprehensive release guide detailing pre-release checks,
+  build and verification commands with real outputs, tag naming and immutability rules,
+  automated vs manual steps, post-release verification, and rollback procedures
+  (issue #339). Linked from `README.md` and `CONTRIBUTING.md`. Closes
+  [issue #339](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/339).
 - `tools/validate/validate.py` and `schemas/fixture-v1.schema.json`: accept
   the lookup and paged RPC methods (`get-ledger-entries`, `get-transaction`,
   `get-ledgers`, `get-transactions`, `get-events`) alongside `get-network`
@@ -766,3 +795,4 @@ discussion and diff. New entries must include that link; see
 [PR #432]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/432
 [PR #431]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/431
 [PR #444]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/444
+[PR #440]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/440

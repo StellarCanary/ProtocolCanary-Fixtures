@@ -757,6 +757,83 @@ and rejects all six decode-failures. With the engine: `stellar-canary` 0.2.0,
 `xdr = true`, reports all 11 as passing — 5 "LedgerEntry round-tripped
 byte-for-byte" and 6 "LedgerEntry was correctly rejected".
 
+## ScVal vectors, maps and addresses
+
+Added 2026-10-22. Composite and address values are what real Soroban calls
+pass: argument lists, storage keys, contract addresses. Their encodings —
+the optional-pointer flag in front of `SCVec`/`SCMap`, the key/value entry
+stride, the address arm — are where an XDR implementation most often differs
+from the reference.
+
+**What this pack tests.** Fourteen fixtures under
+[`protocol-28/xdr/scval-composite/`](../protocol-28/xdr/scval-composite/):
+
+| Group | Fixtures | What they cover |
+|---|---|---|
+| Vec | `p28-xdr-scval-vec-null`, `-vec-empty`, `-vec-one`, `-vec-multi` | absent versus present-but-empty, one element, and three heterogeneous elements |
+| Map | `p28-xdr-scval-map-empty`, `-map-one`, `-map-multi`, `-map-nested`, `-map-unsorted-keys` | empty, one entry, three entries, one level of map-in-vec nesting, and an encoding whose keys are not in ascending order |
+| Address | `p28-xdr-scval-address-account`, `-address-contract` | the account arm (a `PublicKey` union inside an `SCAddress` union) and the contract arm (a plain 32-byte id) |
+| Decode failures | `p28-xdr-scval-vec-count-exceeds-data`, `-map-truncated-after-key`, `-address-unknown-discriminant` | a count larger than the data, an entry cut after its key, and an undefined `SCAddressType` |
+
+**The absent-versus-empty distinction.** `SCVec *vec` and `SCMap *map` are XDR
+optional pointers, so an absent container is a 4-byte flag of 0 and no
+sequence, while a present-but-empty one is flag 1 followed by a count of 0.
+The two encodings differ and both are exercised. A decoder that treated a
+non-zero flag as "present" would also accept corrupt input; the ScVal codec in
+`tests/scval_xdr.py` rejects any flag other than 0 or 1.
+
+**Map entry order.** The XDR definition says nothing about the order of
+entries in an `SCMap`; `ScMap::sorted_from_entries` in the crate sorts when a
+program builds a map that way, but the decoder itself does not enforce an
+order. The generator observed that `from_xdr_base64` accepts the
+non-ascending `b`, `a` encoding and re-encodes it unchanged, and the same
+fixture passes the engine offline, so neither the pinned crate nor
+`stellar-canary` 0.2.0 enforces ascending order on decode. That observation
+is pinned in `p28-xdr-scval-map-unsorted-keys`: an implementation that sorted
+on decode would not round-trip those bytes.
+
+**Depth and recursion.** `p28-xdr-scval-map-nested` nests a vec inside a map
+value — one level — to prove nested containers encode. It does not target a
+depth limit: depth and recursion limits are open issue #303 and no fixture in
+this directory approaches one.
+
+**Where the definitions come from.** Every header cites the pinned file
+`Stellar-contract.x` in `stellar/stellar-xdr` at tag `v28.0`, commit
+`9c9c145953e80990d6ff1ae3a6a973a0ce6d0694`:
+
+- `union SCVal` lines 254-316 with the `SCV_VEC` (298-299), `SCV_MAP`
+  (300-301) and `SCV_ADDRESS` (303-304) cases;
+- `typedef SCVal SCVec<>;` line 242 and `typedef SCMapEntry SCMap<>;` line
+  243, with `struct SCMapEntry` lines 318-322;
+- `enum SCAddressType` lines 179-190 and `union SCAddress` lines 206-222;
+- `typedef PublicKey AccountID;` (`Stellar-types.x` line 85), the `PublicKey`
+  union (lines 53-57) and `typedef Hash ContractID;` (line 87).
+
+**How the payloads were produced.** Every `value_base64` is the output of a
+Rust program that builds the typed value with the official `stellar-xdr`
+28.0.1 crate (features `base64` and `alloc` — the version Protocol-Canary's
+`canary-xdr` pins for Protocol 28) and calls
+`to_xdr_base64(Limits::none())`; nothing is hand-assembled. Each header
+records the construction expression, the crate version, `rustc 1.99.1
+(58cf8f9c3 2026-10-13)` and the generation date (2026-10-22 UTC), and the
+program asserted that `from_xdr_base64` round-trips every valid value and
+rejects every decode-failure value with the error the header quotes
+(`failed to fill whole buffer` twice, `xdr value invalid` once).
+
+The 32-byte address payloads are synthetic structural values: the
+0x11-filled key is not a real account (and no secret key exists for it) and
+the 0x22-filled id is not the hash of any deployed Wasm. No fixture claims a
+network observation or a real contract, account or key.
+
+**Verification.** `tools/validate/validate.py` accepts all 14 fixtures; the
+`tests/scval_xdr.py` cross-check decodes and re-encodes all 11 roundtrips
+byte-for-byte and rejects all 3 decode-failures, 14 of 14 agreeing. With the
+engine: `stellar-canary 0.2.0`, `Protocol-Canary` main at commit
+`bc1330660c36eb67a87747513c7d14ba04d39238`, run offline with
+`--offline --no-cache --json` from a project whose `.stellar-canary.toml`
+enables `xdr = true`, reports all 14 as passing — 11 "ScVal round-tripped
+byte-for-byte" and 3 "ScVal was correctly rejected".
+
 ## Consuming this pack
 
 For a concise index of the fixtures in this pack, see [`protocol-28/README.md`](../protocol-28/README.md).

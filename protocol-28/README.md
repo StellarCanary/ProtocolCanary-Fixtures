@@ -1,6 +1,6 @@
 # Protocol 28 compatibility pack
 
-This pack contains **42 fixtures**.
+This pack contains **56 fixtures**.
 
 Implemented in Stellar Core 28.0.0, Stellar RPC 28.0.0 (integration-tested
 against Soroban host 28.0.1), and the official `stellar-xdr` 28.0.0 crate.
@@ -56,6 +56,20 @@ enumeration.
 | [`xdr/ledger-entry/p28-xdr-ledger-entry-trustline.toml`](xdr/ledger-entry/p28-xdr-ledger-entry-trustline.toml) | xdr | — | A `TRUSTLINE` `LedgerEntry` round-trips byte-for-byte. |
 | [`xdr/ledger-entry/p28-xdr-ledger-entry-ttl-missing-live-until.toml`](xdr/ledger-entry/p28-xdr-ledger-entry-ttl-missing-live-until.toml) | xdr | — | A `TTL` entry missing `liveUntilLedgerSeq` is correctly rejected, not silently accepted. |
 | [`xdr/ledger-entry/p28-xdr-ledger-entry-ttl.toml`](xdr/ledger-entry/p28-xdr-ledger-entry-ttl.toml) | xdr | — | A `TTL` `LedgerEntry` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-address-account.toml`](xdr/scval-composite/p28-xdr-scval-address-account.toml) | xdr | — | An account `ScVal::Address` with a synthetic key round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-address-contract.toml`](xdr/scval-composite/p28-xdr-scval-address-contract.toml) | xdr | — | A contract `ScVal::Address` with a synthetic id round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-address-unknown-discriminant.toml`](xdr/scval-composite/p28-xdr-scval-address-unknown-discriminant.toml) | xdr | — | A `ScVal::Address` with an undefined SCAddressType discriminant is correctly rejected, not silently accepted. |
+| [`xdr/scval-composite/p28-xdr-scval-map-empty.toml`](xdr/scval-composite/p28-xdr-scval-map-empty.toml) | xdr | — | A present-but-empty `ScVal::Map` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-map-multi.toml`](xdr/scval-composite/p28-xdr-scval-map-multi.toml) | xdr | — | A three-entry `ScVal::Map` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-map-nested.toml`](xdr/scval-composite/p28-xdr-scval-map-nested.toml) | xdr | — | A `ScVal::Map` with a `ScVal::Vec` value round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-map-one.toml`](xdr/scval-composite/p28-xdr-scval-map-one.toml) | xdr | — | A one-entry `ScVal::Map` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-map-truncated-after-key.toml`](xdr/scval-composite/p28-xdr-scval-map-truncated-after-key.toml) | xdr | — | A `ScVal::Map` truncated after its key is correctly rejected, not silently accepted. |
+| [`xdr/scval-composite/p28-xdr-scval-map-unsorted-keys.toml`](xdr/scval-composite/p28-xdr-scval-map-unsorted-keys.toml) | xdr | — | A `ScVal::Map` with non-ascending keys round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-vec-count-exceeds-data.toml`](xdr/scval-composite/p28-xdr-scval-vec-count-exceeds-data.toml) | xdr | — | A `ScVal::Vec` whose element count exceeds its data is correctly rejected, not silently accepted. |
+| [`xdr/scval-composite/p28-xdr-scval-vec-empty.toml`](xdr/scval-composite/p28-xdr-scval-vec-empty.toml) | xdr | — | A present-but-empty `ScVal::Vec` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-vec-multi.toml`](xdr/scval-composite/p28-xdr-scval-vec-multi.toml) | xdr | — | A three-element `ScVal::Vec` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-vec-null.toml`](xdr/scval-composite/p28-xdr-scval-vec-null.toml) | xdr | — | An absent (null) `ScVal::Vec` round-trips byte-for-byte. |
+| [`xdr/scval-composite/p28-xdr-scval-vec-one.toml`](xdr/scval-composite/p28-xdr-scval-vec-one.toml) | xdr | — | A one-element `ScVal::Vec` round-trips byte-for-byte. |
 | [`rpc/p28-rpc-network.toml`](rpc/p28-rpc-network.toml) | rpc | — | A configured RPC endpoint's `getNetwork` reports protocol 28 with a `passphrase` field. |
 | [`rpc/p28-rpc-latest-ledger.toml`](rpc/p28-rpc-latest-ledger.toml) | rpc | — | The same endpoint's `getLatestLedger` reports protocol 28, a numeric `sequence`, a string ledger `id`, and no `getNetwork`-only fields. |
 | [`soroban/p28-soroban-native-asset-name.toml`](soroban/p28-soroban-native-asset-name.toml) | soroban | — | The full construct → `simulateTransaction` → result pipeline works against real Protocol 28 infrastructure. |
