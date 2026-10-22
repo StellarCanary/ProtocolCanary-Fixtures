@@ -14,8 +14,8 @@ discussion and diff. New entries must include that link; see
 
 - Cross-platform and multi-Python validation matrix in `.github/workflows/validate.yml`
   running structural fixture validation, verification record checks, fixture-count
-  badge currency, and the repository test suite on Windows (`windows-latest`, Python 3.11.16),
-  macOS (`macos-latest`, Python 3.11.16), and newer Python versions (`ubuntu-latest`, Python 3.12
+  badge currency, and the repository test suite on Windows (`windows-latest`, Python 3.11),
+  macOS (`macos-latest`, Python 3.11), and newer Python versions (`ubuntu-latest`, Python 3.12
   and 3.13) with `fail-fast: false`, preserving the primary Ubuntu Python 3.11.16 job. Tooling
   and test suites audited and hardened for cross-platform execution, path normalization, UTF-8
   encoding, and deterministic newline handling. Closes
