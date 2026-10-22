@@ -12,6 +12,12 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- `tools/registry/generate.py`: added `--allow-empty` and `--protocol N` flags to
+  support explicitly controlled empty-baseline registry generation (issue #370).
+  Normal non-empty packs continue to require fixtures and reject empty directories
+  unless explicitly controlled, generating the canonical empty baseline registry
+  for protocol 29 byte-for-byte. Closes
+  [issue #370](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/370).
 - `tools/validate/validate.py` and `schemas/fixture-v1.schema.json`: accept
   the lookup and paged RPC methods (`get-ledger-entries`, `get-transaction`,
   `get-ledgers`, `get-transactions`, `get-events`) alongside `get-network`
