@@ -511,6 +511,28 @@ suite itself has no third-party dependencies and must keep working without it.
 When the baseline is deliberately raised, update `fail_under` and the baseline
 comment in `.coveragerc` in the same change.
 
+## Cross-platform and multi-Python CI matrix
+
+In addition to the primary validation job on `ubuntu-latest` with Python `3.11.16`
+and the single-platform branch coverage job, CI (`.github/workflows/validate.yml`)
+runs a cross-platform and multi-Python validation matrix (`validate-matrix`)
+covering:
+
+- `windows-latest` with Python `3.11.16`
+- `macos-latest` with Python `3.11.16`
+- `ubuntu-latest` with Python `3.12`
+- `ubuntu-latest` with Python `3.13`
+
+Each matrix cell runs the same validation suite as the primary job:
+structural fixture validation, verification record checks, fixture-count badge
+currency, and the unit test suite.
+
+This matrix ensures that fixtures, schemas, tooling (`tools/`), and tests
+remain strictly portable across operating systems (normalizing paths with
+`/` separators, using UTF-8 text encoding, avoiding Windows reserved filenames,
+and handling CRLF vs LF line endings deterministically) and compatible with
+newer Python releases.
+
 ## Weekly engine-drift check
 
 `.github/workflows/engine-drift.yml` builds `StellarCanary/Protocol-Canary`'s

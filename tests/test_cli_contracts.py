@@ -46,7 +46,7 @@ class CliContractTests(unittest.TestCase):
 
     def run_tool(self, tool_rel_path: str, *args: str) -> subprocess.CompletedProcess[str]:
         cmd = [PYTHON, str(REPO_ROOT / tool_rel_path), *args]
-        return subprocess.run(cmd, capture_output=True, text=True)
+        return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
 
     def test_doc_options_match_help(self) -> None:
         docs_text = (REPO_ROOT / "docs" / "tools.md").read_text(encoding="utf-8")
@@ -124,12 +124,18 @@ class CliContractTests(unittest.TestCase):
         p_unknown = self.run_tool(tool, str(self.pack_dir), "--unknown-flag")
         self.assertEqual(p_unknown.returncode, 2)
 
-        # Read-only output directory (exit 1)
-        ro_dir = Path(self.temp_dir) / "ro_dist"
-        ro_dir.mkdir(parents=True, exist_ok=True)
-        ro_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)
-        p_ro = self.run_tool(tool, str(self.pack_dir), "--version", "1.0.0", "--output-dir", str(ro_dir))
-        self.assertEqual(p_ro.returncode, 1)
+        # Unwritable output directory (exit 1)
+        if os.name == "posix":
+            ro_dir = Path(self.temp_dir) / "ro_dist"
+            ro_dir.mkdir(parents=True, exist_ok=True)
+            ro_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)
+            p_ro = self.run_tool(tool, str(self.pack_dir), "--version", "1.0.0", "--output-dir", str(ro_dir))
+            self.assertEqual(p_ro.returncode, 1)
+        else:
+            blocker = Path(self.temp_dir) / "ro_blocker"
+            blocker.write_text("not a directory", encoding="utf-8", newline="\n")
+            p_ro = self.run_tool(tool, str(self.pack_dir), "--version", "1.0.0", "--output-dir", str(blocker / "nested"))
+            self.assertEqual(p_ro.returncode, 1)
 
         # Empty pack (fails build, PackError, exit 1)
         empty_pack = Path(self.temp_dir) / "empty-pack"

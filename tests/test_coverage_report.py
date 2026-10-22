@@ -510,7 +510,7 @@ class ReadOnlyTests(unittest.TestCase):
 
             def digest() -> dict[str, str]:
                 return {
-                    str(p.relative_to(pack)): hashlib.sha256(p.read_bytes()).hexdigest()
+                    p.relative_to(pack).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                     for p in sorted(pack.rglob("*"))
                     if p.is_file()
                 }
@@ -522,7 +522,7 @@ class ReadOnlyTests(unittest.TestCase):
             self.assertEqual(digest(), before)
             # ... and no new files appeared (no __pycache__, no manifest).
             self.assertEqual(
-                sorted(str(p.relative_to(pack)) for p in pack.rglob("*") if p.is_file()),
+                sorted(p.relative_to(pack).as_posix() for p in pack.rglob("*") if p.is_file()),
                 sorted(before),
             )
 

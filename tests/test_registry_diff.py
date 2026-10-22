@@ -321,6 +321,7 @@ class CommandLineTests(unittest.TestCase):
             [sys.executable, str(DIFF_PATH), "--help"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=True,
         )
         self.assertIn("Exit codes", result.stdout)
@@ -343,9 +344,10 @@ class RealRegistryTests(unittest.TestCase):
             [sys.executable, str(GENERATE_PATH), str(self.pack), "--stdout"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=True,
         )
-        output.write_text(result.stdout, encoding="utf-8")
+        output.write_text(result.stdout, encoding="utf-8", newline="\n")
         return output
 
     def test_two_registries_from_the_pack_at_different_states(self) -> None:

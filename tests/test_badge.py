@@ -211,6 +211,7 @@ class BadgeArgumentTests(unittest.TestCase):
             [sys.executable, str(BADGE_PATH), *args],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=REPO_ROOT,
         )
 

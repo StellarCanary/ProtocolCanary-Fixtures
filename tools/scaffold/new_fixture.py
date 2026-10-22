@@ -175,7 +175,7 @@ def main(argv: list[str]) -> int:
                 # Another process may have created it since the path walk.
                 continue
             created_dirs.append(directory)
-        handle = target_file.open("x", encoding="utf-8")
+        handle = target_file.open("x", encoding="utf-8", newline="\n")
         created_file = True
         with handle:
             handle.write(content)

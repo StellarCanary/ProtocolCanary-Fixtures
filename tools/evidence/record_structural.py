@@ -92,6 +92,7 @@ def git_revision(repo_root: Path) -> str:
             ["git", "-C", str(repo_root), "rev-parse", "HEAD"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=30,
         )
     except (OSError, subprocess.SubprocessError):
