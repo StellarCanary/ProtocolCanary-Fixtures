@@ -209,7 +209,7 @@ class Protocol28PackTests(unittest.TestCase):
         # invariant directly: the pack's only file is README.md and every
         # directory inside it is empty.
         self.assertEqual(
-            sorted(str(p.relative_to(p27)) for p in p27.rglob("*") if p.is_file()),
+            sorted(p.relative_to(p27).as_posix() for p in p27.rglob("*") if p.is_file()),
             ["README.md"],
         )
         non_empty_dirs = [p for p in p27.rglob("*") if p.is_dir() and any(p.iterdir())]

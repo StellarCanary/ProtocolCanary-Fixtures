@@ -134,6 +134,7 @@ class CaptureLiveTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=REPO_ROOT,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -262,6 +263,7 @@ class CaptureLiveTests(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 cwd=REPO_ROOT,
             )
         self.assertEqual(result.returncode, 1)
@@ -288,6 +290,7 @@ class CaptureLiveTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=REPO_ROOT,
         )
         self.assertEqual(result.returncode, 1)
@@ -333,6 +336,7 @@ class CaptureLiveTests(unittest.TestCase):
                 ],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 cwd=REPO_ROOT,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
