@@ -32,6 +32,7 @@ discussion and diff. New entries must include that link; see
   `docs/tools.md`; the tests cover a match, every difference kind, both output
   formats, standard input, and each unusable-input path. Closes
   [issue #279](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/279).
+  ([PR #467](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/467))
 
 - `tests/fixtures/rpc/`: one fixture per RPC method F-017 added
   (`get-health`, `get-version-info`, `get-fee-stats`), so the accepted
@@ -51,6 +52,7 @@ discussion and diff. New entries must include that link; see
   `tools/evidence/capture_live.py`, whose allowlist is exactly the three
   read-only methods CF-04 section 8 names. Closes
   [issue #280](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/280).
+  ([PR #467](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/467))
 
 - Thirty-four `protocol-28/xdr/scval/` fixtures covering the scalar `ScVal`
   variants, which the pack previously had no evidence for: the primitives
