@@ -12,7 +12,6 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
-<<<<<<< HEAD
 - `schemas/run-record-v1.schema.json` and `tools/release/run_records.py`: the
   pack-by-engine run record and its reader (issue #367). A record names one
   exact engine version, the CF-02 pack digest of the pack it ran against, the
@@ -106,7 +105,6 @@ discussion and diff. New entries must include that link; see
   caught, and the production tools are never modified. Closes
   [issue #349](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/349).
   ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
-=======
 - `tools/validate/validate_registry.py` — cross-validates a pack's fixtures
   against its committed `registry-v1.json` (issue #273, CF-02 section 6 rules
   2 and 3): every regular `*.toml` on disk must be listed in the registry,
@@ -121,7 +119,6 @@ discussion and diff. New entries must include that link; see
   [issue #273](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/273).
   ([PR #473](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/473))
 
->>>>>>> 4288814 (docs: link registry changelog entry to PR)
 - `tools/inventory/compare.py`: a standard-library tool that compares the
   inventory `stellar-canary fixtures --format json` prints (CA-02,
   `inventoryVersion` 1) with a pack's `registry-v1.json`, asserting that the
