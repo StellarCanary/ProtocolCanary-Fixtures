@@ -55,8 +55,10 @@ near a day boundary ambiguous by up to a day, defeating that purpose.
    credentials. A link into GitHub (`github.com/.../blob/...` or
    `raw.githubusercontent.com/...`) must name a full commit SHA or a release
    tag, not a branch such as `master`, so it keeps describing what the
-   fixture was written against; documentation pages have no ref to pin. The
-   header comment (a `#`
+   fixture was written against; documentation pages have no ref to pin.
+   The host name in a `source_reference` URL may only contain ASCII letters,
+   digits, `.` and `-` without empty labels or percent-encoding (non-ASCII hosts
+   must be written in punycode). The header comment (a `#`
    comment block above the TOML body) explains, in prose, how the expected
    value was derived or observed — e.g. "built with the official
    `stellar-xdr` 28.0.0 crate against the CAP-0083 `StellarValue` type",
@@ -256,7 +258,7 @@ Per-surface body (everything else in the file):
 | Surface | Fields |
 |---|---|
 | `xdr` | `type` (currently `"StellarValue"`, `"ContractExecutable"` or `"ScVal"`), `kind` (`"decode-success"` \| `"decode-failure"` \| `"roundtrip"` \| `"encode-equals"`), `value_base64`, `expected_base64` (only for `encode-equals`) |
-| `rpc` | `method` (`"get-network"` \| `"get-latest-ledger"` \| `"get-ledger-entries"` \| `"get-transaction"` \| `"get-ledgers"` \| `"get-transactions"` \| `"get-events"`), one or more `[[assert]]` tables (`{kind, field, value?, expected_type?}`), optional `[request]` table |
+| `rpc` | `method` (`"get-network"` \| `"get-latest-ledger"` \| `"get-health"` \| `"get-version-info"` \| `"get-fee-stats"` \| `"get-ledger-entries"` \| `"get-transaction"` \| `"get-ledgers"` \| `"get-transactions"` \| `"get-events"`), one or more `[[assert]]` tables (`{kind, field, value?, expected_type?}`), optional `[request]` table |
 | `soroban` | `source_account`, `contract_id`, `function`, `sequence_number`, optional `[[args]]` tables (`{kind, value?}`; kinds `"bool"`, `"u32"`, `"i32"`, `"u64"`, `"i64"`, `"i128"`, `"u128"`, `"i256"`, `"u256"`, `"void"`, `"duration"`, `"timepoint"`, `"symbol"`, `"string"`, `"bytes"`, `"address"`, `"vec"`, `"map"`; `void` omits `value`, `vec`/`map` nest at most 8 levels), `[expect]` (`{kind = "simulation-success"}` or `{kind = "simulation-error", message_contains?}`) |
 
 ### Unknown top-level fields
@@ -291,6 +293,46 @@ and is released.
 The same applies to an RPC `method` outside the methods the table above lists:
 open an issue/PR against `Protocol-Canary`'s `canary-rpc` crate first, and only
 add the fixture here once that support exists and is released.
+
+### The engine-vocabulary vector
+
+The names this repository's validator accepts — XDR types and kinds, RPC
+methods, RPC assertion kinds, Soroban expectation kinds and the surfaces —
+must be exactly the names `Protocol-Canary`'s parsers accept. The shared
+list is `tests/fixtures/engine-vocabulary.json`: one array per vocabulary,
+the engine source file each array was read from, and the `engineCommit` (a
+full 40-character commit SHA) they were read at.
+`tests/test_engine_vocabulary_parity.py` compares every array with
+`tools/validate/validate.py`'s constant and with the matching enum in
+`schemas/fixture-v1.schema.json`, so a name the engine accepts but the
+validator rejects — or the other way round — fails the test suite by name
+instead of surfacing later as a fixture one side accepts and the other
+rejects.
+
+To update the vector when the engine changes:
+
+1. Read the engine sources named next to each array in the vector
+   (`crates/canary-xdr/src/decoder.rs`, `crates/canary-xdr/src/runner.rs`,
+   `crates/canary-rpc/src/request.rs`, `crates/canary-rpc/src/runner.rs`,
+   `crates/canary-soroban/src/runner.rs`, `crates/canary-core/src/model.rs`)
+   at the `Protocol-Canary` commit you are moving to.
+2. Rewrite the affected arrays and set `engineCommit` to that commit's full
+   SHA. Only names the parser accepts belong in an array: a name a contract
+   document describes but the parser rejects goes into
+   `contractOnlyNotImplemented` instead.
+3. Change `tools/validate/validate.py`'s constant and the matching enum in
+   `schemas/fixture-v1.schema.json` in the same pull request, and update the
+   documents that list the vocabulary (`README.md`, the per-surface table
+   above, `docs/contracts.md`).
+4. Run `python3 -m unittest discover tests`; the parity test must pass
+   before the pull request is opened.
+
+A name the engine's parser accepts but this repository's validator does not
+yet accept is recorded in `engineOnlyNotYetAccepted`, together with the
+engine commit that added it. That list is documentation only — the parity
+test does not compare it — and moving the pin to that commit is a
+deliberate change that has to update the arrays, the validator and the
+schema together.
 
 ## What never belongs in a fixture
 
@@ -337,7 +379,9 @@ rules therefore apply to every change:
 
 Both rules are repository contracts, not style advice: a fixture that breaks
 one fails `make validate` (and therefore CI), and the archive and registry
-tools reject the pack before it can be released.
+tools reject the pack before it can be released. The full procedure for
+packaging, verifying, attesting, and publishing a pack release is documented in
+[`docs/releasing.md`](docs/releasing.md).
 
 ## Pack limits
 
@@ -390,6 +434,7 @@ Quick reference for what contributors hit most often. Each line is the error as
 | `expect.message_contains must be a string, got ...` / `expect.message_contains must not be empty; ...` | The loader reads the field with `toml::Value::as_str`, so a non-string is silently dropped and an empty string matches every message — either way the fixture asserts less than it appears to. Quote the needle, or omit the key entirely to assert only that the simulation fails. |
 | `field 'expected_base64' is only allowed for kind 'encode-equals', not 'roundtrip'` | `expected_base64` states the expected encoding, and only an `encode-equals` fixture has one; the loader rejects the field for every other kind. Use `kind = "encode-equals"`, or drop the field. |
 | `README.md's fixtures badge is stale; run ...` | You added or removed a `*.toml`, so the fixture count in README.md is now wrong. Run `make badge` and commit the result. |
+| `git diff --exit-code` shows `registry-v1.json` as changed (CI step `check-registry`) | You changed a fixture or payload without regenerating the pack's registry manifest. Run `python3 tools/registry/generate.py protocol-28` (or, for an empty baseline, `python3 tools/registry/generate.py protocol-29 --allow-empty --protocol 29`) and commit the regenerated `registry-v1.json`. |
 | `missing required field '...'` with no obvious cause | Historically a typo'd duplicate of the intended field (e.g. `soure_reference`). Unknown keys are now rejected outright and named — see [Unknown top-level fields](#unknown-top-level-fields). |
 
 `make check` runs these in CI's order (`validate` → `badge-check` → `test`) and
@@ -420,6 +465,52 @@ introducing commit instead:
 
 A changelog entry without one of these links is not ready for review.
 
+### Automated CHANGELOG validation (rule [F-055])
+
+Pull request CI validates that a changelog entry is present whenever a pull
+request modifies governed files:
+
+- **Governed paths** requiring an entry under `## [Unreleased]`:
+  - Protocol packs (`protocol-*/`)
+  - Schemas (`schemas/`)
+  - Tools and scripts (`tools/`)
+- **Exempt paths** that do not require an entry when changed on their own:
+  - Documentation (`docs/`, root `README.md`, `CONTRIBUTING.md`, `SECURITY.md`)
+  - Tests (`tests/`)
+  - CI workflows (`.github/`)
+  - Repository configuration (`Makefile`, `.gitignore`, `.gitattributes`)
+
+If a pull request modifies governed files without modifying `CHANGELOG.md`, the
+pull request CI job will fail.
+
+#### Opting out with the `no-changelog` label
+
+If a pull request touches governed files but represents an internal refactoring,
+code cleanup, or other non-user-facing change that does not warrant a changelog
+entry, apply the **`no-changelog`** label to the pull request. CI reads pull
+request labels from the event payload and bypasses the changelog check when
+`no-changelog` is present.
+
+#### Checking changelog status locally
+
+Contributors can check changelog compliance locally before opening or pushing a
+PR:
+
+```bash
+# Compare working branch against origin/main:
+python3 tools/validate/check_changelog.py --base origin/main
+
+# Or check specific changed files:
+python3 tools/validate/check_changelog.py protocol-28/xdr/fixture.toml CHANGELOG.md
+
+# Or via make:
+make check-changelog
+```
+
+*(Note: CI does not require the changelog entry to include the PR number at check
+time, since the PR number is not known before the pull request is opened. You can
+add the link with the assigned PR number before merge.)*
+
 ## Development setup
 
 No build system is required. `tools/validate/validate.py` uses only the
@@ -431,6 +522,7 @@ For convenience, a `Makefile` wraps the commands CI runs:
 - `make badge` — regenerates README.md's fixture-count badge.
 - `make badge-check` — fails if that badge is stale.
 - `make test` — the repository test suite.
+- `make check-changelog` — verify CHANGELOG entry for changed files.
 - `make check-links` — check fixture source reference links across all packs.
 - `make coverage` — the test suite under branch coverage of `tools/`, failing
   below `.coveragerc`'s threshold. Needs the development-only dependency

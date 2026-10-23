@@ -15,9 +15,12 @@ Schema; and the registry generator (`tools/registry/generate.py`,
 (`tools/registry/diff.py`, `make registry-diff`) reports which fixtures were
 added, removed or changed between two registries, so a pack release can be
 described from the registry data instead of by hand; it reads only the two
-registry files and changes no contract. The generated
-`registry-v1.json` is not committed yet: that, and the CI freshness check that
-goes with it, is CF-02-E. Also still open: CF-02-D (the registry validator
+registry files and changes no contract. Both packs' generated
+`registry-v1.json` files are committed (`protocol-28/registry-v1.json`,
+`protocol-29/registry-v1.json`), and CI's `check-registry` step in
+`.github/workflows/validate.yml` regenerates them on every push and pull
+request and fails when either differs from the committed file — that is
+CF-02-E. Also still open: CF-02-D (the registry validator
 rules), CF-02-F (the Rust pack walker and digest that must match CF-02-A) and
 CF-02-H (`.gitattributes` pinning LF for pack files).
 
@@ -94,12 +97,14 @@ them are closed vocabularies that contributors hit first:
   `4418690`) and contract `ca-01-rpc-requests-and-assertions.md`.
   `field-number-range` accepts `field`, and at least one of `min` and `max`
   (integers or finite floats, with `min <= max`).
-- **RPC `method` and `[request]` validation (F-052).** `tools/validate/validate.py`
+- **RPC `method` and `[request]` validation (F-052, F-017).** `tools/validate/validate.py`
   and `schemas/fixture-v1.schema.json` accept `get-network`, `get-latest-ledger`,
-  `get-ledger-entries`, `get-transaction`, `get-ledgers`, `get-transactions` and
-  `get-events`, mirroring `crates/canary-rpc/src/request.rs` (read at Protocol-Canary
-  commit `1f549145751b1e6f044a7d6797fee12a1977da09`) and contract CA-01-K:
-  - `get-network` and `get-latest-ledger` take no parameters and reject a `[request]` table;
+  `get-health`, `get-version-info`, `get-fee-stats`, `get-ledger-entries`,
+  `get-transaction`, `get-ledgers`, `get-transactions` and `get-events`, mirroring
+  `crates/canary-rpc/src/request.rs` (read at Protocol-Canary commit
+  `94d7c794780a7c87944c5177ff1f8eb3edec300e`) and contract CA-01-K:
+  - `get-network`, `get-latest-ledger`, `get-health`, `get-version-info` and
+    `get-fee-stats` take no parameters and reject a `[request]` table;
   - `get-ledger-entries` requires `keys` (an array of non-empty base64 strings, at most 50 entries) and optionally accepts `xdrFormat = "base64"`;
   - `get-transaction` requires `hash` (64 lowercase hex characters) and optionally accepts `xdrFormat = "base64"`;
   - `get-ledgers` and `get-transactions` optionally accept `startLedger` (a 32-bit unsigned integer, `0 <= startLedger <= 4294967295`), `[pagination]` (with `cursor` as a non-empty string and/or `limit` as an integer `1 <= limit <= 50`), and `xdrFormat = "base64"`;
