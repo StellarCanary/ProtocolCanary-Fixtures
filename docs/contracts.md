@@ -15,15 +15,13 @@ Schema; and the registry generator (`tools/registry/generate.py`,
 (`tools/registry/diff.py`, `make registry-diff`) reports which fixtures were
 added, removed or changed between two registries, so a pack release can be
 described from the registry data instead of by hand; it reads only the two
-registry files and changes no contract. The corpus cross-validation
-(`tools/validate/validate_registry.py`, issue #273) checks what is committed
-against what is on disk: every `*.toml` in the pack must be listed in the
-registry, every listed fixture and payload must exist, and every recorded
-`sha256` must equal the file's bytes. The generated
-`registry-v1.json` is not committed yet: that, and the CI freshness check that
-goes with it, is CF-02-E. Also still open: CF-02-D (the rest of the registry
-validator rules: packDigest recomputation, registry ids and metadata equal to
-the TOML, canonical encoding), CF-02-F (the Rust pack walker and digest that must match CF-02-A) and
+registry files and changes no contract. Both packs' generated
+`registry-v1.json` files are committed (`protocol-28/registry-v1.json`,
+`protocol-29/registry-v1.json`), and CI's `check-registry` step in
+`.github/workflows/validate.yml` regenerates them on every push and pull
+request and fails when either differs from the committed file — that is
+CF-02-E. Also still open: CF-02-D (the registry validator
+rules), CF-02-F (the Rust pack walker and digest that must match CF-02-A) and
 CF-02-H (`.gitattributes` pinning LF for pack files).
 
 | Contract | What this repository owns |
