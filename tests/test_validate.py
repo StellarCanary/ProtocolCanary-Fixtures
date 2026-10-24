@@ -1267,6 +1267,51 @@ field = "id"
                 for supported in ("get-health", "get-version-info", "get-fee-stats"):
                     self.assertIn(supported, errors[0])
 
+    def test_the_test_fixtures_cover_each_health_and_diagnostic_method(self) -> None:
+        # Accepting a method and never using it leaves the vocabulary
+        # unproven, so F-017 also ships one fixture per method, under
+        # tests/fixtures/rpc/. They stay out of a protocol pack on purpose:
+        # a pack's RPC fixtures must all be capturable by
+        # tools/evidence/capture_live.py, whose allowlist is the three
+        # read-only methods CF-04 section 8 names.
+        rpc_fixtures = REPO_ROOT / "tests" / "fixtures" / "rpc"
+        report = validate.validate_directory(rpc_fixtures)
+        self.assertEqual(report.errors, [], report.errors)
+        methods: list[str] = []
+        for path in sorted(rpc_fixtures.glob("*.toml")):
+            with open(path, "rb") as handle:
+                methods.append(tomllib.load(handle)["method"])
+        self.assertEqual(
+            sorted(methods),
+            ["get-fee-stats", "get-health", "get-version-info"],
+        )
+
+    def test_the_schema_accepts_the_health_and_diagnostic_methods(self) -> None:
+        # The validator leg is covered above; this is the schema leg (F-017).
+        # jsonschema_lite cannot run the schema's allOf/if/then blocks, so the
+        # rpc method enum is checked directly, which is the part of the
+        # schema that decides whether these names are authorable.
+        block = schema_sync.surface_block(schema_sync.load_schema(), "rpc")
+        assert block is not None
+        method_schema = block["properties"]["method"]
+        for method in ("get-health", "get-version-info", "get-fee-stats"):
+            with self.subTest(method=method):
+                self.assertIn(method, method_schema["enum"])
+                self.assertEqual(jsonschema_lite.validate(method, method_schema), [])
+
+    def test_the_schema_rejects_misspelled_health_method_names(self) -> None:
+        block = schema_sync.surface_block(schema_sync.load_schema(), "rpc")
+        assert block is not None
+        method_schema = block["properties"]["method"]
+        for invalid_method in ("get_health", "getHealthy", "get_fee_stats"):
+            with self.subTest(method=invalid_method):
+                problems = jsonschema_lite.validate(invalid_method, method_schema)
+                self.assertEqual(len(problems), 1, problems)
+                self.assertIn(invalid_method, problems[0])
+                for supported in ("get-health", "get-version-info", "get-fee-stats"):
+                    self.assertIn(supported, problems[0])
+                    self.assertIn(supported, method_schema["enum"])
+
     def test_rpc_get_ledger_entries_valid_and_invalid(self) -> None:
         base = """
 id = "p28-rpc-entries"
@@ -2822,6 +2867,86 @@ class SourceReferenceFormatTests(unittest.TestCase):
         self.assertIsNotNone(message)
         self.assertIn("host", message)
 
+    def test_rejects_non_public_ipv4_networks(self) -> None:
+        # Exercise both ends of each explicitly denied CIDR.
+        denied_ranges = (
+            ("0.0.0.0", "0.255.255.255"),
+            ("10.0.0.0", "10.255.255.255"),
+            ("100.64.0.0", "100.127.255.255"),
+            ("127.0.0.0", "127.255.255.255"),
+            ("169.254.0.0", "169.254.255.255"),
+            ("172.16.0.0", "172.31.255.255"),
+            ("192.0.0.0", "192.0.0.255"),
+            ("192.0.2.0", "192.0.2.255"),
+            ("192.168.0.0", "192.168.255.255"),
+            ("198.18.0.0", "198.19.255.255"),
+            ("198.51.100.0", "198.51.100.255"),
+            ("203.0.113.0", "203.0.113.255"),
+            ("224.0.0.0", "239.255.255.255"),
+            ("240.0.0.0", "255.255.255.255"),
+        )
+        for first, last in denied_ranges:
+            for address in (first, last):
+                with self.subTest(address=address):
+                    self.assertIsNotNone(validate.non_public_host_problem(address))
+
+    def test_non_public_host_policy_normalizes_local_names(self) -> None:
+        for host in (
+            "localhost",
+            "api.localhost",
+            "router.local",
+            "printer.localdomain",
+            "db.internal",
+            "device.home.arpa",
+        ):
+            with self.subTest(host=host):
+                self.assertIsNotNone(validate.non_public_host_problem(host))
+        self.assertIsNotNone(validate.non_public_host_problem("LOCALHOST"))
+        self.assertIsNotNone(validate.non_public_host_problem("LOCALHOST."))
+        # Normalize exactly one trailing dot; do not strip repeatedly.
+        self.assertIsNone(validate.non_public_host_problem("localhost.."))
+        self.assertIsNone(validate.non_public_host_problem("example.org.."))
+
+    def test_rejects_noncanonical_numeric_hosts(self) -> None:
+        for host in (
+            "2130706433",
+            "0x7f000001",
+            "0177.0.0.1",
+            "127.1",
+            "127.0.1",
+            "127.0.0x1",
+            "example.123",
+            "example.0x10",
+        ):
+            with self.subTest(host=host):
+                self.assertIsNotNone(validate.non_public_host_problem(host))
+
+    def test_accepts_public_host_policy_cases(self) -> None:
+        for host in (
+            "example.org",
+            "developers.stellar.org",
+            "soroban-testnet.stellar.org",
+            "rpc.example.invalid",
+            "8.8.8.8",
+            "notlocalhost.example.org",
+            "internal.example.org",
+        ):
+            with self.subTest(host=host):
+                self.assertIsNone(validate.non_public_host_problem(host))
+
+    def test_rejects_bracketed_ipv6_source_reference_hosts(self) -> None:
+        for host in ("[2001:4860:4860::8888]", "[::1]", "[::ffff:8.8.8.8]"):
+            value = f"https://{host}/docs/reference"
+            with self.subTest(host=host):
+                message = self.problem(value)
+                self.assertIsNotNone(message)
+                if host == "[::ffff:8.8.8.8]":
+                    self.assertIn("IPv6", message)
+
+    def test_accepts_bracketed_ipvfuture_source_reference_host(self) -> None:
+        value = "https://[v1.foo]/docs/reference"
+        self.assertIsNone(self.problem(value))
+
     def test_rejects_embedded_credentials(self) -> None:
         for value in (
             f"https://user:secret@github.com/stellar/stellar-protocol/blob/{self.SHA}/core/cap-0083.md",
@@ -2867,6 +2992,68 @@ class SourceReferenceFormatTests(unittest.TestCase):
                 "https://raw.githubusercontent.com/stellar/stellar-protocol/refs/heads/master/core/cap-0083.md"
             )
         )
+
+    def test_github_host_spellings_and_trailing_dot_accepted_when_pinned(self) -> None:
+        """Positive tests: commit-pinned and tag-pinned links on github.com.,
+        WWW.GITHUB.COM. and the raw host with a trailing dot; ordinary hosts (F-121, issue #415).
+        """
+        path = f"/stellar/stellar-protocol/blob/{self.SHA}/core/cap-0083.md"
+        tag_path = "/stellar/stellar-protocol/blob/v28.0.1/core/cap-0083.md"
+        raw_commit_path = f"/stellar/stellar-protocol/{self.SHA}/core/cap-0083.md"
+        raw_tag_path = "/stellar/stellar-protocol/v28.0.1/core/cap-0083.md"
+
+        for base_url in (
+            f"https://github.com.{path}",
+            f"https://github.com.{tag_path}",
+            f"https://WWW.GITHUB.COM.{path}",
+            f"https://WWW.GITHUB.COM.{tag_path}",
+            f"https://raw.githubusercontent.com.{raw_commit_path}",
+            f"https://raw.githubusercontent.com.{raw_tag_path}",
+            "https://developers.stellar.org/docs/data/apis/rpc/api-reference/methods/getNetwork",
+            f"https://github.com:443{path}",
+        ):
+            with self.subTest(url=base_url):
+                self.assertIsNone(self.problem(base_url), base_url)
+
+    def test_github_host_spellings_and_malformed_hosts_rejected(self) -> None:
+        """Negative tests: branch refs on trailing dot spellings, malformed hosts,
+        percent, non-ASCII letters, empty labels, only dots (F-121, issue #415).
+        """
+        branch_path = "/stellar/stellar-protocol/blob/master/core/cap-0083.md"
+        raw_branch_path = "/stellar/stellar-protocol/master/core/cap-0083.md"
+
+        # Valid trailing-dot hosts with branch ref must be rejected with the pin message
+        for host, p in (
+            ("github.com.", branch_path),
+            ("WWW.GITHUB.COM.", branch_path),
+            ("www.github.com.", branch_path),
+            ("GITHUB.COM.", branch_path),
+            ("raw.githubusercontent.com.", raw_branch_path),
+        ):
+            with self.subTest(host=host, case="branch_ref"):
+                message = self.problem(f"https://{host}{p}")
+                self.assertIsNotNone(message, host)
+                self.assertIn("pin", message)
+                self.assertIn("branch name", message)
+
+        # Malformed host spellings must be rejected with host-character message naming source_reference
+        malformed_hosts = (
+            "github.com..",
+            "github..com",
+            ".github.com",
+            "git%68ub.com",
+            "github.com\u3002",
+            "g\u00edthub.com",
+            "....",
+            ".",
+        )
+        for host in malformed_hosts:
+            for p in (branch_path, f"/stellar/stellar-protocol/blob/{self.SHA}/core/cap-0083.md"):
+                with self.subTest(host=host, path=p, case="malformed"):
+                    message = self.problem(f"https://{host}{p}")
+                    self.assertIsNotNone(message, host)
+                    self.assertIn("source_reference", message)
+                    self.assertIn("host", message)
 
     def test_rejects_a_short_commit_hash(self) -> None:
         # Seven characters is ambiguous and can start to collide; the link
@@ -2977,7 +3164,10 @@ class SourceReferenceFormatTests(unittest.TestCase):
         self.assertTrue(any("source_reference" in e and "'see issue'" in e for e in report.errors))
 
     def test_every_shipped_fixture_reference_passes(self) -> None:
-        for path in sorted((REPO_ROOT).glob("protocol-*/**/*.toml")):
+        paths = sorted((REPO_ROOT).glob("protocol-*/**/*.toml"))
+        # Guard against the glob matching nothing, which would pass vacuously.
+        self.assertGreater(len(paths), 0)
+        for path in paths:
             data = tomllib.loads(path.read_text(encoding="utf-8"))
             reference = data.get("source_reference")
             self.assertIsInstance(reference, str, path)
@@ -3176,6 +3366,42 @@ class VerificationEvidenceTests(unittest.TestCase):
         ):
             with self.subTest(bad):
                 self.assertTrue(self.problems(endpointHost=bad))
+
+    def test_endpoint_host_rejects_non_public_hosts_after_shape_validation(self) -> None:
+        for host in (
+            "localhost",
+            "service.local",
+            "10.1.2.3",
+            "127.1",
+            "2130706433",
+        ):
+            with self.subTest(host=host):
+                found = self.problems(endpointHost=host)
+                self.assertTrue(any("endpointHost uses a non-public host" in p for p in found), found)
+
+        # Shape errors retain precedence and do not also receive host-policy errors.
+        found = self.problems(endpointHost="127.0.0.1:443")
+        self.assertTrue(any("host name only" in p for p in found), found)
+        self.assertFalse(any("non-public host" in p for p in found), found)
+
+    def test_a_local_mock_dry_run_may_name_a_loopback_endpoint_host(self) -> None:
+        # capture_live.py --local-endpoint records the loopback mock under the
+        # network name "local-mock"; that is the one place a loopback host is
+        # accepted, and the exemption does not stretch to other hosts or labels.
+        mock_network = dict(self.LIVE["network"], name="local-mock")
+        for host in ("127.0.0.1", "localhost", "LOCALHOST"):
+            with self.subTest(host=host):
+                self.assertEqual(self.problems(network=mock_network, endpointHost=host), [])
+        for host in ("10.0.0.5", "169.254.169.254", "192.168.1.1", "127.0.0.2", "service.local", "2130706433"):
+            with self.subTest(still_rejected=host):
+                found = self.problems(network=mock_network, endpointHost=host)
+                self.assertTrue(any("endpointHost uses a non-public host" in p for p in found), found)
+        for name in ("testnet", "mainnet", "futurenet", "LOCAL-MOCK", "local-mock "):
+            with self.subTest(other_network=name):
+                found = self.problems(network=dict(self.LIVE["network"], name=name), endpointHost="127.0.0.1")
+                self.assertTrue(any("endpointHost uses a non-public host" in p for p in found), found)
+        found = self.problems(network=None, endpointHost="127.0.0.1")
+        self.assertTrue(any("endpointHost uses a non-public host" in p for p in found), found)
 
     def test_evidence_ref_must_stay_inside_the_repository(self) -> None:
         for bad in ("/etc/passwd", "../outside.json", "a/../b.json", "a\\b.json", "a//b.json"):

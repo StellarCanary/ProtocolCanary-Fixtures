@@ -4,7 +4,7 @@
 ![ProtocolCanary-Fixtures](assets/ProtocolCanary-Fixtures-banner.svg)
 
 
-[![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) <!-- fixtures-badge:start -->[![Fixtures: 90](https://img.shields.io/badge/fixtures-90-blue.svg)](#protocol-packs)<!-- fixtures-badge:end -->
+[![Validate](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml/badge.svg)](https://github.com/StellarCanary/ProtocolCanary-Fixtures/actions/workflows/validate.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE) <!-- fixtures-badge:start -->[![Fixtures: 91](https://img.shields.io/badge/fixtures-91-blue.svg)](#protocol-packs)<!-- fixtures-badge:end -->
 
 Canonical compatibility fixtures for Stellar Protocol Canary.
 
@@ -227,6 +227,10 @@ No fixture asserts a value that isn't traceable to an authoritative
 upstream source; see [`CONTRIBUTING.md`](CONTRIBUTING.md). The full procedure
 for packaging, verifying, attesting, and publishing a pack release is documented
 in [`docs/releasing.md`](docs/releasing.md).
+
+Published pack release archives and manifests also carry cryptographically
+signed build provenance attestations; see [`SECURITY.md`](SECURITY.md#build-provenance-and-attestation)
+for verification instructions.
 
 ## Validation
 

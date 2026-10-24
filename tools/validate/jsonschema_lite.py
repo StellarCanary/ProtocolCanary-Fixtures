@@ -15,9 +15,14 @@ document pass. To use a new keyword, implement it here and add a test.
 Supported: ``type``, ``enum``, ``const``, ``required``, ``properties``,
 ``patternProperties``, ``additionalProperties``, ``items``, ``minItems``,
 ``maxItems``, ``uniqueItems``, ``minLength``, ``maxLength``, ``pattern``,
-``minimum``, ``maximum``, ``minProperties`` and local ``$ref`` pointers.
+``minimum``, ``maximum``, ``minProperties``, ``allOf`` and local ``$ref`` pointers.
 Annotation keywords (``$schema``, ``$id``, ``$comment``, ``title``,
 ``description``, ``examples``, ``default``) are ignored.
+
+``pattern`` and ``patternProperties`` keep ECMA-262 semantics: ``$`` matches
+only at the end of the input, not before a trailing newline as Python's
+``re`` would allow (see :func:`_ecma_pattern`). Patterns are searched for,
+not required to match the whole value.
 
 Usage:
     from jsonschema_lite import validate
@@ -63,6 +68,7 @@ SUPPORTED_KEYWORDS = frozenset(
         "minimum",
         "maximum",
         "minProperties",
+        "allOf",
         "$ref",
     }
 )
@@ -73,9 +79,52 @@ class SchemaError(ValueError):
     """The schema itself uses something this validator does not implement."""
 
 
+def _ecma_pattern(pattern: str) -> str:
+    r"""Return ``pattern`` with every anchor ``$`` rewritten as ``\Z``.
+
+    JSON Schema patterns follow ECMA-262, where ``$`` matches only at the
+    end of the input, but Python's ``$`` also matches just before a trailing
+    newline, so an anchored pattern would wrongly accept a value that ends
+    in ``\n``. ``\Z`` is exactly the end of the string, so translating the
+    anchor keeps the rest of the pattern interpreted as before. An escaped
+    ``\$`` and a ``$`` inside a character class are literals in both and
+    are left untouched.
+    """
+    translated: list[str] = []
+    index = 0
+    in_class = False
+    while index < len(pattern):
+        char = pattern[index]
+        if char == "\\":
+            translated.append(pattern[index : index + 2])  # keep the escape pair
+            index += 2
+        elif in_class:
+            translated.append(char)  # a literal $ in a class is left alone
+            if char == "]":
+                in_class = False
+            index += 1
+        elif char == "[":
+            in_class = True
+            translated.append(char)
+            index += 1
+            if index < len(pattern) and pattern[index] == "^":
+                translated.append("^")  # negated class
+                index += 1
+            if index < len(pattern) and pattern[index] == "]":
+                translated.append("]")  # a leading ] is a literal, not the end
+                index += 1
+        elif char == "$":
+            translated.append("\\Z")
+            index += 1
+        else:
+            translated.append(char)
+            index += 1
+    return "".join(translated)
+
+
 @lru_cache(maxsize=512)
 def _compiled_pattern(pattern: str):
-    return re.compile(pattern)
+    return re.compile(_ecma_pattern(pattern))
 
 
 def _compile_pattern(pattern: str, path: str):
@@ -129,19 +178,23 @@ def _where(path: str) -> str:
     return path or "$"
 
 
-def _check(value: Any, schema: Any, root: dict, path: str, errors: list[str]) -> None:
+def _check(
+    value: Any, schema: Any, root: dict, path: str, errors: list[str], schema_path: str = "$"
+) -> None:
     if schema is True:
         return
     if schema is False:
         errors.append(f"{_where(path)}: no value is allowed here")
         return
     if not isinstance(schema, dict):
-        raise SchemaError(f"a schema must be an object or a boolean, got {schema!r}")
+        raise SchemaError(
+            f"a schema must be an object or a boolean at {_where(schema_path)}, got {schema!r}"
+        )
 
     unknown = set(schema) - SUPPORTED_KEYWORDS - ANNOTATION_KEYWORDS
     if unknown:
         raise SchemaError(
-            f"unsupported schema keyword(s) {sorted(unknown)} at {_where(path)}; "
+            f"unsupported schema keyword(s) {sorted(unknown)} at {_where(schema_path)}; "
             "implement them in tools/validate/jsonschema_lite.py before using them"
         )
 
@@ -151,7 +204,7 @@ def _check(value: Any, schema: Any, root: dict, path: str, errors: list[str]) ->
         _compile_pattern(pattern, path)
 
     if "$ref" in schema:
-        _check(value, _resolve(schema["$ref"], root), root, path, errors)
+        _check(value, _resolve(schema["$ref"], root), root, path, errors, schema_path)
 
     if "type" in schema:
         wanted = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
@@ -159,7 +212,8 @@ def _check(value: Any, schema: Any, root: dict, path: str, errors: list[str]) ->
             errors.append(
                 f"{_where(path)}: expected {' or '.join(wanted)}, got {_type_name(value)}"
             )
-            return  # keywords below assume the right type
+            # Type-specific keywords below are guarded by the value's type.
+            # Continue so composition and other sibling keywords still apply.
 
     if "const" in schema and not (
         value == schema["const"] and _type_name(value) == _type_name(schema["const"])
@@ -207,7 +261,8 @@ def _check(value: Any, schema: Any, root: dict, path: str, errors: list[str]) ->
                 seen.append(item)
         if "items" in schema:
             for index, item in enumerate(value):
-                _check(item, schema["items"], root, f"{path}[{index}]", errors)
+                _check(item, schema["items"], root, f"{path}[{index}]", errors,
+                       f"{schema_path}.items")
 
     if isinstance(value, dict):
         if "minProperties" in schema and len(value) < schema["minProperties"]:
@@ -225,17 +280,34 @@ def _check(value: Any, schema: Any, root: dict, path: str, errors: list[str]) ->
             matched = False
             if name in properties:
                 matched = True
-                _check(member, properties[name], root, child, errors)
+                _check(member, properties[name], root, child, errors,
+                       f"{schema_path}.properties.{name}")
             for pattern, sub in patterns.items():
                 if _compile_pattern(pattern, path).search(name):
                     matched = True
-                    _check(member, sub, root, child, errors)
+                    _check(member, sub, root, child, errors,
+                           f"{schema_path}.patternProperties.{pattern}")
             if not matched and "additionalProperties" in schema:
                 extra = schema["additionalProperties"]
                 if extra is False:
                     errors.append(f"{_where(path)}: unexpected property {name!r}")
                 elif extra is not True:
-                    _check(member, extra, root, child, errors)
+                    _check(member, extra, root, child, errors,
+                           f"{schema_path}.additionalProperties")
+
+    if "allOf" in schema:
+        subschemas = schema["allOf"]
+        all_of_path = f"{schema_path}.allOf"
+        if not isinstance(subschemas, list) or not subschemas:
+            raise SchemaError(f"allOf must be a non-empty list at {_where(all_of_path)}")
+        for index, subschema in enumerate(subschemas):
+            sub_path = f"{all_of_path}[{index}]"
+            if not isinstance(subschema, (dict, bool)):
+                raise SchemaError(
+                    f"allOf entries must be schemas (objects or booleans) at "
+                    f"{_where(sub_path)}, got {subschema!r}"
+                )
+            _check(value, subschema, root, path, errors, sub_path)
 
 
 def validate(document: Any, schema: dict) -> list[str]:
