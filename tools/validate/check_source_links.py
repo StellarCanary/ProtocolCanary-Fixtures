@@ -482,9 +482,16 @@ def check_link(
         except NonPublicAddressError:
             return CheckResult("Failed", "refused: non-public address")
         except urllib.error.HTTPError as exc:
-            if exc.code == 429:
+            # The error carries the response body. Close it here, so the
+            # connection is released now rather than by the garbage
+            # collector; since Python 3.12 an implicitly cleaned-up
+            # response warns (ResourceWarning) at whatever later point the
+            # collection happens to land.
+            code = exc.code
+            exc.close()
+            if code == 429:
                 return CheckResult("Inconclusive", "HTTP 429 Too Many Requests")
-            if exc.code == 405:
+            if code == 405:
                 # Some RPC endpoints (e.g., soroban-testnet) reject GET with 405 Method Not Allowed.
                 # Try POST with empty payload as a fallback check. The address
                 # policy is applied again: the POST is a new request to the
@@ -503,13 +510,15 @@ def check_link(
                     )
                     resp = opener.open(post_req, timeout=timeout)
                 except urllib.error.HTTPError as post_exc:
-                    if post_exc.code == 429:
+                    post_code = post_exc.code
+                    post_exc.close()
+                    if post_code == 429:
                         return CheckResult("Inconclusive", "HTTP 429 Too Many Requests")
-                    return CheckResult("Failed", f"HTTP {post_exc.code}")
+                    return CheckResult("Failed", f"HTTP {post_code}")
                 except Exception as post_err:
                     return CheckResult("Failed", f"POST fallback failed: {post_err}")
             else:
-                return CheckResult("Failed", f"HTTP {exc.code}")
+                return CheckResult("Failed", f"HTTP {code}")
         except (TimeoutError, urllib.error.URLError) as exc:
             reason = getattr(exc, "reason", str(exc))
             if "timed out" in str(reason).lower() or isinstance(exc, TimeoutError):
@@ -557,14 +566,84 @@ def find_fixture_files(root: Path) -> list[Path]:
     return sorted(p for p in root.rglob("*.toml") if p.is_file())
 
 
+# Line breakers become one space (CRLF is collapsed first in the function
+# below), mirroring the boundaries ``str.splitlines`` recognises, so no value
+# can split a table row across lines.
+_CELL_LINE_BREAKS = str.maketrans(
+    {
+        "\n": " ",
+        "\r": " ",
+        "\v": " ",
+        "\f": " ",
+        "\x1c": " ",
+        "\x1d": " ",
+        "\x1e": " ",
+        "\x85": " ",
+        "\u2028": " ",
+        "\u2029": " ",
+    }
+)
+
+# Backslash is translated before the entities below so an odd trailing
+# backslash in a value cannot interact with the ``\|`` pipe escape.
+_CELL_ENTITIES = str.maketrans(
+    {
+        "\\": "&#92;",
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "[": "&#91;",
+        "]": "&#93;",
+        "`": "&#96;",
+    }
+)
+
+
+def _escape_markdown_cell(value: str) -> str:
+    """Neutralise ``value`` so it stays inside one Markdown table cell.
+
+    The chosen approach (see ``generate_markdown_table``'s docstring):
+
+    * line breaks (CRLF, LF, CR and the Unicode line separators) become a
+      single space, so a value can never split a row across lines;
+    * ``\\`` becomes ``&#92;`` first, so the only backslash left in the cell
+      is the escape this function itself inserts;
+    * ``&``, ``<``, ``>``, ``[``, ``]`` and backticks become HTML entities
+      (``&amp;``, ``&lt;``, ``&gt;``, ``&#91;``, ``&#93;``, ``&#96;``), which
+      GitHub's Markdown renderer displays literally: no raw tag, link or code
+      span can be formed from fixture-controlled text;
+    * ``|`` becomes ``\\|``, the Markdown table-cell escape, so a pipe in a
+      URL or file name cannot add a column.
+    """
+    text = str(value).replace("\r\n", "\n").translate(_CELL_LINE_BREAKS)
+    text = text.translate(_CELL_ENTITIES)
+    return text.replace("|", "\\|")
+
+
 def generate_markdown_table(rows: list[tuple[str, str, CheckResult]]) -> str:
-    """Generate a Markdown table from a list of (url, fixture_file, result) tuples."""
+    """Generate a Markdown table from a list of (url, fixture_file, result) tuples.
+
+    Every interpolated value -- URL, fixture file name and result detail --
+    comes from fixture content, file names or exception text, all of which a
+    fixture author influences, so each one is passed through
+    ``_escape_markdown_cell``: line breaks become spaces (every row occupies
+    exactly one line), ``&``, ``<``, ``>``, ``[``, ``]``, backticks and
+    backslashes become HTML entities, and ``|`` becomes ``\\|``. The result
+    is that every row keeps exactly three cells and nothing in a cell can
+    form a link, an HTML tag or a code span in the rendered job summary.
+    Ordinary URLs (for example ``https://example.org/a?b=c``) contain none of
+    those characters and stay exactly as written.
+    """
     lines = [
         "| URL | Fixture File | Result |",
         "|---|---|---|",
     ]
     for url, fixture_file, result in rows:
-        lines.append(f"| {url} | {fixture_file} | {result.formatted()} |")
+        lines.append(
+            f"| {_escape_markdown_cell(url)} "
+            f"| {_escape_markdown_cell(fixture_file)} "
+            f"| {_escape_markdown_cell(result.formatted())} |"
+        )
     return "\n".join(lines)
 
 

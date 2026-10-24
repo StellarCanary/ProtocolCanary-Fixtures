@@ -29,6 +29,7 @@ from tools.validate.check_source_links import (
     CheckResult,
     clean_comment_url,
     check_link,
+    DEFAULT_MAX_REDIRECTS,
     extract_links_from_file,
     generate_markdown_table,
     main,
@@ -123,6 +124,38 @@ class MockServerHandler(BaseHTTPRequestHandler):
             # Rejects GET with 405 Method Not Allowed
             self.send_response(405)
             self.end_headers()
+        elif path.startswith("/redirect-status/"):
+            code = int(path.split("/")[-1])
+            self.send_response(code)
+            self.send_header("Location", "/200")
+            self.end_headers()
+        elif path.startswith("/status/"):
+            code = int(path.split("/")[-1])
+            self.send_response(code)
+            self.end_headers()
+        elif path.startswith("/chain/"):
+            n = int(path.split("/")[-1])
+            if n == 0:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"OK")
+            else:
+                self.send_response(302)
+                self.send_header("Location", f"/chain/{n - 1}")
+                self.end_headers()
+        elif path == "/redirect-no-location":
+            self.send_response(302)
+            self.end_headers()
+        elif path == "/redirect-relative":
+            self.send_response(302)
+            self.send_header("Location", "/relative-target")
+            self.end_headers()
+        elif path == "/relative-target":
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
         else:
             self.send_response(404)
             self.end_headers()
@@ -301,20 +334,32 @@ source_reference = "ftp://example.com/spec.txt"
 
     def test_check_link_post_fallback_failures(self) -> None:
         url = f"{self.base_url}/rpc-endpoint"
+        # An explicit empty body, not None: HTTPError is an addinfourl, and
+        # on Python 3.14 that base class wraps the body in a
+        # tempfile._TemporaryFileWrapper, whose __del__ warns
+        # (ResourceWarning) when it is collected unclosed. check_link closes
+        # what it catches and only reads `code`, so an empty body changes
+        # nothing it observes.
         cases = (
             (
-                urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None),
+                urllib.error.HTTPError(url, 429, "Too Many Requests", {}, io.BytesIO(b"")),
                 "Inconclusive",
                 "429",
             ),
-            (urllib.error.HTTPError(url, 503, "Unavailable", {}, None), "Failed", "503"),
+            (
+                urllib.error.HTTPError(url, 503, "Unavailable", {}, io.BytesIO(b"")),
+                "Failed",
+                "503",
+            ),
             (RuntimeError("connection reset"), "Failed", "POST fallback failed"),
         )
         for post_error, expected_status, expected_detail in cases:
             with self.subTest(error=type(post_error).__name__):
                 opener = Mock()
                 opener.open.side_effect = [
-                    urllib.error.HTTPError(url, 405, "Method Not Allowed", {}, None),
+                    urllib.error.HTTPError(
+                        url, 405, "Method Not Allowed", {}, io.BytesIO(b"")
+                    ),
                     post_error,
                 ]
                 result = check_link(url, opener=opener, policy=LOOPBACK_POLICY)
@@ -368,6 +413,63 @@ source_reference = "ftp://example.com/spec.txt"
             f"{self.base_url}/redirect-chain-1", max_redirects=4, policy=LOOPBACK_POLICY
         )
         self.assertEqual(res_ok.status, "OK")
+
+    def test_every_redirect_status_followed_and_non_redirect_3xx_failed(self) -> None:
+        """Every redirect status code (301, 302, 303, 307, 308) is followed to 200 OK, while 300/304 fail (F-125, issue #421)."""
+        redirect_statuses = (301, 302, 303, 307, 308)
+        for status in redirect_statuses:
+            with self.subTest(redirect_status=status):
+                res = check_link(f"{self.base_url}/redirect-status/{status}")
+                self.assertEqual(res.status, "OK", f"expected status {status} to be followed to OK")
+                self.assertEqual(res.formatted(), "OK")
+
+        non_redirect_statuses = (300, 304)
+        for status in non_redirect_statuses:
+            with self.subTest(non_redirect_status=status):
+                res = check_link(f"{self.base_url}/status/{status}")
+                self.assertEqual(res.status, "Failed")
+                self.assertIn(f"HTTP {status}", res.formatted())
+
+    def test_redirect_limit_exact_boundaries(self) -> None:
+        """A chain of exactly N redirects passes; N - 1 fails; max_redirects=0 with 1 redirect fails and 0 passes (F-125, issue #421)."""
+        # Chain of 3 redirects
+        res_exact = check_link(f"{self.base_url}/chain/3", max_redirects=3)
+        self.assertEqual(res_exact.status, "OK")
+
+        res_over = check_link(f"{self.base_url}/chain/3", max_redirects=2)
+        self.assertEqual(res_over.status, "Failed")
+        self.assertIn("too many redirects (exceeded limit of 2)", res_over.formatted())
+
+        # max_redirects = 0
+        res_zero_ok = check_link(f"{self.base_url}/chain/0", max_redirects=0)
+        self.assertEqual(res_zero_ok.status, "OK")
+
+        res_zero_fail = check_link(f"{self.base_url}/chain/1", max_redirects=0)
+        self.assertEqual(res_zero_fail.status, "Failed")
+        self.assertIn("too many redirects (exceeded limit of 0)", res_zero_fail.formatted())
+
+    def test_default_max_redirects_boundary(self) -> None:
+        """Assert DEFAULT_MAX_REDIRECTS == 5, 5 redirects pass with default, 6 fail (F-125, issue #421)."""
+        self.assertEqual(DEFAULT_MAX_REDIRECTS, 5)
+
+        res_5 = check_link(f"{self.base_url}/chain/5")
+        self.assertEqual(res_5.status, "OK")
+
+        res_6 = check_link(f"{self.base_url}/chain/6")
+        self.assertEqual(res_6.status, "Failed")
+        self.assertIn("too many redirects (exceeded limit of 5)", res_6.formatted())
+
+    def test_redirect_location_handling_relative_and_missing(self) -> None:
+        """Relative Location resolves against current URL; redirect without Location fails (F-125, issue #421)."""
+        # Relative Location
+        res_rel = check_link(f"{self.base_url}/redirect-relative")
+        self.assertEqual(res_rel.status, "OK")
+
+        # Missing Location header
+        res_missing = check_link(f"{self.base_url}/redirect-no-location")
+        self.assertEqual(res_missing.status, "Failed")
+        self.assertIn("missing Location header", res_missing.formatted())
+        self.assertIn("HTTP 302", res_missing.formatted())
 
     def test_check_link_redirect_loop_detection(self) -> None:
         res = check_link(f"{self.base_url}/loop-a", policy=LOOPBACK_POLICY)
@@ -706,6 +808,75 @@ class NonPublicDestinationTests(unittest.TestCase):
                 exit_code = main([tmp_dir])
         self.assertEqual(exit_code, 1)
         self.assertIn("refused: non-public address", stdout_buf.getvalue())
+
+
+class MarkdownTableEscapingTests(unittest.TestCase):
+    """F-107: hostile fixture text must not reshape the job summary table.
+
+    URLs, file names and result details all originate from fixture content or
+    exception text a fixture author influences, so every interpolated value
+    must stay inside exactly one cell of exactly one line.
+    """
+
+    HOSTILE_ROWS = [
+        ("https://a.example/x|y", "f.toml", CheckResult("Failed", "a|b\nc")),
+        (
+            "https://b.example/[x](https://evil.example)<script>",
+            "b|c.toml",
+            CheckResult("OK"),
+        ),
+        (
+            "https://c.example/a?b=c",
+            "plain name.toml",
+            CheckResult("Inconclusive", "tick `code` & slash \\ end"),
+        ),
+    ]
+
+    @staticmethod
+    def cells(line: str) -> list[str]:
+        """Split a table line into cells; escaped pipes are not separators."""
+        # "| a | b | c |" -> ['', ' a ', ' b ', ' c ', '']
+        return line.replace("\\|", "").split("|")[1:-1]
+
+    def test_header_and_separator_are_exact(self) -> None:
+        table = generate_markdown_table(list(self.HOSTILE_ROWS))
+        lines = table.split("\n")
+        self.assertEqual(lines[0], "| URL | Fixture File | Result |")
+        self.assertEqual(lines[1], "|---|---|---|")
+        # One line per row: no value's line break split a row in two.
+        self.assertEqual(len(lines), 2 + len(self.HOSTILE_ROWS))
+
+    def test_every_row_has_exactly_three_cells(self) -> None:
+        table = generate_markdown_table(list(self.HOSTILE_ROWS))
+        for line in table.split("\n"):
+            with self.subTest(line=line):
+                self.assertEqual(len(self.cells(line)), 3)
+
+    def test_pipes_in_values_do_not_add_columns(self) -> None:
+        table = generate_markdown_table(list(self.HOSTILE_ROWS))
+        self.assertIn("https://a.example/x\\|y", table)
+        self.assertIn("b\\|c.toml", table)
+        self.assertIn("Failed (a\\|b c)", table)
+
+    def test_markup_is_neutralised_but_plain_urls_stay_readable(self) -> None:
+        table = generate_markdown_table(list(self.HOSTILE_ROWS))
+        # No live HTML tag, Markdown link or code span survives.
+        self.assertNotIn("<script>", table)
+        self.assertNotIn("[x](https://evil.example)", table)
+        self.assertNotIn("`code`", table)
+        self.assertIn("&lt;script&gt;", table)
+        self.assertIn("&#91;x&#93;", table)
+        self.assertIn("&#96;code&#96;", table)
+        self.assertIn("&amp;", table)
+        # Ordinary URLs and names are untouched.
+        self.assertIn("https://c.example/a?b=c", table)
+        self.assertIn("plain name.toml", table)
+
+    def test_count_of_rows_matches_input(self) -> None:
+        table = generate_markdown_table(list(self.HOSTILE_ROWS))
+        self.assertEqual(len(table.split("\n")) - 2, len(self.HOSTILE_ROWS))
+        empty = generate_markdown_table([])
+        self.assertEqual(len(empty.split("\n")), 2)
 
 
 if __name__ == "__main__":

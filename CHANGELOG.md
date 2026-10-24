@@ -12,12 +12,305 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- `tools/validate/check_source_links.py` escapes every value it writes into the
+  Markdown job summary (F-107). The URL, the fixture file name and the result
+  detail come from fixture content, file names and exception text, so a fixture
+  author could add table cells, split a row across lines or smuggle a live link
+  or raw HTML into the summary maintainers read; even a plain `|` in a URL broke
+  the table. Line breaks now become a space, `&`, `<`, `>`, `[`, `]`, backticks
+  and backslashes become HTML entities, and `|` becomes `\|`, so every row keeps
+  exactly three cells and nothing in a cell can form a link, tag or code span.
+  Ordinary URLs contain none of those characters and are unchanged. Five new
+  tests in `tests/test_check_source_links.py`. Closes
+  [issue #389](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/389).
+  ([PR #435](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/435))
+
+- `tools/validate/jsonschema_lite.py` supports the `allOf` keyword (F-113): the
+  instance is checked against every subschema in order and each failure is
+  reported, with the subschema's location in a schema error such as
+  `$.allOf[1]`. Sibling keywords are still applied next to `allOf` (including
+  when the instance has the wrong type), an empty or non-list `allOf` and an
+  entry that is not a schema are schema errors, and a local `$ref` inside a
+  subschema resolves as before. A schema that uses an unsupported keyword
+  such as `if` is still rejected, which keeps the fixture schema's behavior in
+  `tests/test_validate.py` unchanged. Eight new tests in
+  `tests/test_jsonschema_lite.py`. Closes
+  [issue #395](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/395).
+  ([PR #417](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/417))
+
+- `tools/validate/check_root_files.py` (F-054): a CI guard, run by the validate
+  workflow, that fails when a file or directory outside an explicit allow-list
+  appears in the repository root (`protocol-NN/` packs are always allowed), so a
+  stray scratch file can no longer be committed unnoticed. It reads the root
+  from `git ls-files` (falling back to a directory scan outside a git
+  checkout), exits 1 and names each unexpected entry, and uses only the
+  standard library. The same change removes the three stray root files it
+  would have caught: `PR_DESCRIPTION.md`, `diff.txt` and `main_CONTRIBUTING.md`.
+  `tests/test_check_root_files.py` covers the allow-list, path normalization,
+  the git and fallback listings and the exit codes. Closes
+  [issue #328](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/328).
+  ([PR #399](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/399))
+
+- Protocol 29 coverage now includes a Protocol 28-versus-29 RPC mismatch
+  fixture, with separate Testnet and Futurenet verification records whose
+  passphrases are validated against their network names. The release pack
+  tests also cover deterministic archives and D-06 limits, and `pack.py
+  --verified` requires valid, passing CF-04 evidence for every fixture.
+  Closes
+  [issues #294](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/294),
+  [#293](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/293),
+  [#292](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/292),
+  and [#266](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/266).
+  ([PR #468](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/468))
+
+- `schemas/run-record-v1.schema.json` and `tools/release/run_records.py`: the
+  pack-by-engine run record and its reader (issue #367). A record names one
+  exact engine version, the CF-02 pack digest of the pack it ran against, the
+  RFC 3339 UTC instant of the run, the verifier and the outcome; a range, a
+  future date, a record for another pack or a malformed file is refused.
+  `tools/release/manifest.py --runs DIR` sets `compatibleEngines[].verified`
+  to `true` only for an engine version whose record names that exact engine,
+  that exact pack digest and a passed run; without `--runs`, and with an
+  empty record directory, every engine stays unverified exactly as before.
+  The tool never writes a record: a record comes from an actual run.
+  `docs/run-records.md` states the format and the rule. Closes
+  [issue #367](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/367).
+  ([PR #425])
+- `tools/common/atomic_write.py` writes release artifacts atomically, and
+  `tools/pack/pack.py`, `tools/release/manifest.py` and
+  `tools/registry/generate.py` use it for every output, including the
+  `sha256sum`-format checksum file. The bytes of the archive, the manifest,
+  the checksum file and the registry are unchanged; only the way they are
+  published is. A release artifact now appears under its final name only
+  once it is complete: the temporary file is created in the destination
+  directory (so the replacement is on the same filesystem), written, flushed
+  and `fsync`ed, then moved into place with `os.replace`, and the containing
+  directory is `fsync`ed afterwards on POSIX. An interrupted write leaves
+  either no file or the previous complete content, and never a partial file
+  under the final name; the temporary file is removed and the original error
+  propagates. `tests/test_atomic_write.py` covers the failure paths, the
+  replacement of an existing file, concurrent writers, and the SHA-256
+  baselines of the four protocol-28 artifacts, which are byte-for-byte
+  identical to the ones the tools produced before this change. Closes
+  [issue #345](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/345).
+  ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
+- `tests/test_verify_archive_hostile.py` and `tests/hostile_archives.py` add
+  a hostile-archive corpus for `tools/pack/verify_archive.py`. Every input is
+  built locally with the standard library from the real `protocol-28` pack and
+  is deterministic, so the corpus is regenerated rather than downloaded. The
+  corpus covers malformed tar headers, invalid UTF-8 names, NUL bytes in a
+  name, PAX path overrides, FIFO, symbolic and hard link entries, setuid bits,
+  absolute and `..` paths, duplicate and case-fold duplicate paths, GNU long
+  names, GNU sparse entries, truncated headers, truncated member data and
+  truncated gzip streams, concatenated gzip members, trailing bytes after the
+  tar end markers, and extra files at the archive root and inside the pack
+  directory. Each case runs the `verify_archive.py` command line tool and
+  asserts the exit code (0 valid, 1 invalid, 2 unreadable), that no traceback
+  is printed, and that nothing is written outside the verifier's own
+  temporary directory. Every case names the CF-06 clause it exercises and is
+  classified as `rejected`, `accepted` or `policy-decision`. Five cases are
+  accepted today and are listed with the follow-up a maintainer has to make:
+  trailing bytes after the tar end markers, a concatenated gzip member, an
+  extra file at the archive root, an extra file inside the pack directory,
+  and (as a control) a tar header with a wrong magic but a valid checksum.
+  Accepting an archive is not, on its own, evidence of an exploitable
+  problem; it is a question about what the contract says. The tools
+  themselves are unchanged. Closes
+  [issue #346](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/346).
+  ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
+- `tests/test_jsonschema_differential.py` compares
+  `tools/validate/jsonschema_lite.py` with the reference Draft 2020-12
+  implementation from a pinned `jsonschema` development dependency. The
+  instances are the ones the repository produces -- the registry for
+  `protocol-28`, the manifest for the archive built from it, and the
+  checked-in `upstream-matrix.json` -- each mutated one fault at a time from
+  a fixed seed, plus hand-written edge cases for `pattern`, `uniqueItems`,
+  numeric bounds, booleans against integers and `additionalProperties`. A
+  mismatch is reported with the schema name, the JSON Pointer of the instance
+  node, the instance, both verdicts and the seed. The differences that are
+  known and reviewed are recorded in the test module: JSON Schema 2020-12
+  calls `1.0` an integer and compares `const` and `enum` by value, while
+  `jsonschema_lite` requires a Python `int` and compares by type name, so it
+  is stricter in three cases and more permissive in one (`enum` keeps `true`
+  and `1` apart in JSON Schema, but not in `jsonschema_lite`; no schema in
+  scope uses `enum` with a numeric member). A difference that is not on that
+  list fails the test. `requirements-differential.txt` pins the dependencies
+  with the SHA-256 of every published artifact, and
+  `.github/workflows/schema-differential.yml` runs the comparison on manual
+  dispatch and on a schedule, with read-only permissions and actions pinned
+  to commit SHAs. The default test suite installs nothing: the comparison
+  skips itself with a clear message when `jsonschema` is not importable.
+  Closes
+  [issue #347](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/347).
+  ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
+- `tests/test_build_environment.py` adds a regression guard that the
+  archive, the registry and the manifest do not depend on the environment
+  they are built in. The three release tools are run in temporary copies of
+  the repository under different time zones, locales, `PYTHONHASHSEED`
+  values and process umasks; the outputs are compared byte for byte, and the
+  same pack written in reversed and shuffled order is compared as well. The
+  guard covers one operating system and one Python version -- the ones it is
+  run on -- and does not claim cross-operating-system or
+  cross-Python-version reproducibility. The guard is proved to have teeth: a
+  scratch copy of the packer that leaks the time zone into the gzip header is
+  caught, and the production tools are never modified. Closes
+  [issue #349](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/349).
+  ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
+- `tools/validate/validate_registry.py` — cross-validates a pack's fixtures
+  against its committed `registry-v1.json` (issue #273, CF-02 section 6 rules
+  2 and 3): every regular `*.toml` on disk must be listed in the registry,
+  every listed fixture and payload must exist on disk, and every recorded
+  `sha256` must equal the file's bytes — an orphaned fixture, a phantom entry
+  or a drifted hash is rejected by path (exit 1), while an unusable registry
+  is input error (exit 2). Without arguments every `protocol-*` directory is
+  checked; freshness and `packDigest` stay with CI's regeneration diff.
+  `tests/test_validate_registry.py` covers the three rejections, payload
+  entries, unusable inputs and the CLI contract (24 tests), and
+  `docs/tools.md` records the command-line contract. Closes
+  [issue #273](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/273).
+  ([PR #473](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/473))
+
+- `tools/inventory/compare.py`: a standard-library tool that compares the
+  inventory `stellar-canary fixtures --format json` prints (CA-02,
+  `inventoryVersion` 1) with a pack's `registry-v1.json`, asserting that the
+  engine's loader discovered exactly the fixtures the registry lists, each
+  with the same `surface` and `category`. It reports fixtures the engine did
+  not discover, fixtures the registry does not list, and one entry per
+  mismatched attribute; it exits `0` only when the inventories match, `1` when
+  they differ, and `2` for an input it cannot compare (a missing or unreadable
+  file, a document that is not UTF-8 or JSON, an unknown `inventoryVersion`,
+  `fixtureFormat` or `registryVersion`, `directoryFound: false`, a
+  `counts.total` that contradicts the fixture list, a duplicate fixture id, a
+  registry that does not conform to `schemas/registry-v1.schema.json`, or an
+  inventory and a registry for different protocols). The documented empty
+  baseline (`protocol-29/registry-v1.json`, `fixtures: []`) is compared as a
+  real empty inventory rather than refused, so a fixture the engine discovers
+  but the registry does not list is reported as the difference it is.
+  `--format json` prints one deterministic document for CI. Documented in
+  `docs/tools.md`; the tests cover a match, every difference kind, both output
+  formats, standard input, and each unusable-input path. Closes
+  [issue #279](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/279).
+  ([PR #467](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/467))
+
+- `tests/fixtures/rpc/`: one fixture per RPC method F-017 added
+  (`get-health`, `get-version-info`, `get-fee-stats`), so the accepted
+  vocabulary is exercised by a fixture and not only by a constant. The
+  validator and schema already accepted the three names; what was missing was
+  a fixture for each method and a test for the schema leg (the schema's
+  `allOf`/`if`/`then` blocks are outside `jsonschema_lite`'s supported subset,
+  so the RPC method enum is checked directly). `tests/test_validate.py` now
+  validates the three files structurally, asserts each `method` is in the
+  schema enum, and asserts the misspellings `get_health`, `getHealthy` and
+  `get_fee_stats` are rejected with a diagnostic that lists the allowed
+  names. Each fixture documents the answer shape captured live from
+  `https://soroban-testnet.stellar.org` on 2026-10-22 and asserts only what
+  `canary-rpc`'s typed models expose, by type where a value moves with the
+  network. They live under `tests/fixtures/` rather than in a pack because
+  every RPC fixture of a pack must be capturable by
+  `tools/evidence/capture_live.py`, whose allowlist is exactly the three
+  read-only methods CF-04 section 8 names. Closes
+  [issue #280](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/280).
+  ([PR #467](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/467))
+
+- Thirty-four `protocol-28/xdr/scval/` fixtures covering the scalar `ScVal`
+  variants, which the pack previously had no evidence for: the primitives
+  (`void`, `bool` true and false, `u32`, `i32`, `u64`, `i64`, `timepoint`,
+  `duration`), the wide integers (`u128`, `i128`, `u256`, `i256` at their
+  minimum, maximum and zero, plus a `u128` with the high bit set), and
+  `bytes`, `string` and `symbol` at empty, small and — for `symbol` — the
+  `SCSYMBOL_LIMIT` boundary of 32 bytes. Seven decode-failure fixtures complete
+  the set: six truncations and a 33-byte symbol. Every payload was produced by
+  the official `stellar-xdr` 28.0.1 crate (features `base64`, `alloc` —
+  `rustc 1.99.1`, generated 2026-10-22 UTC) through a recorded construction
+  expression, never hand-assembled, and the same program asserted that
+  `from_xdr_base64` round-trips each valid value and rejects each invalid one
+  (`failed to fill whole buffer` for the truncations, `xdr value max length
+  exceeded` for the 33-byte symbol). The `u128` high-bit fixture is valid
+  input and its header distinguishes it by ScValType discriminant from the
+  bit-identical `i128` minimum; `u8` and `i8` are not ScVal variants and no
+  fixture invents one. Every header cites `Stellar-contract.x` (plus
+  `Stellar-types.x` where a typedef is involved) at `stellar/stellar-xdr`
+  v28.0 (commit `9c9c145`) with file and line ranges, labels its bytes as
+  synthetic structural values, and claims no network observation. All 34 pass
+  `tools/validate/validate.py` and agree with `tests/scval_xdr.py` (decode and
+  re-encode bit-for-bit; the seven invalid payloads rejected), and all 34 pass
+  the engine offline (`stellar-canary 0.2.0`, `Protocol-Canary` commit
+  `bc13306`): 27 round-trips byte-for-byte, 7 correctly rejected. The
+  `protocol-28` pack's CF-04 structural records were regenerated, so
+  `protocol-28/evidence/records/` holds one record per fixture. Closes
+  [issue #360](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/360).
+  ([PR #439])
+
+- Fourteen `protocol-28/xdr/scval-composite/` fixtures covering the composite
+  and address `ScVal` variants: `Vec` absent, present-but-empty, one element and
+  three heterogeneous elements; `Map` empty, one entry, three entries, one
+  level of map-in-vec nesting, and an encoding with non-ascending keys; and
+  `Address` in both the account and contract arms. Three decode-failure
+  fixtures complete the set: a vec whose count exceeds its data, a map cut
+  after its key, and an address with an undefined `SCAddressType`. The vec and
+  map fixtures pin the optional-pointer distinction (`SCVec *`/`SCMap *`), so
+  an absent container and a present-but-empty one are shown to be different
+  encodings. The non-ascending map records an observation: the pinned crate's
+  `from_xdr_base64` accepted it and re-encoded it unchanged, and the engine
+  passed it offline, so neither enforces ascending entry order on decode at
+  these versions. Every payload was produced by the official `stellar-xdr`
+  28.0.1 crate (features `base64`, `alloc` — `rustc 1.99.1`, generated
+  2026-10-22 UTC) through a recorded construction expression, never
+  hand-assembled; the three invalid payloads are documented mutations of
+  crate-produced values that the same crate rejects (`failed to fill whole
+  buffer` twice, `xdr value invalid` once). Address bytes are labelled
+  synthetic structural values — 0x11-filled is not a real account key and
+  0x22-filled is not a real contract id — and no fixture targets a depth limit
+  (open #303). Every header cites `Stellar-contract.x` and `Stellar-types.x`
+  at `stellar/stellar-xdr` v28.0 (commit `9c9c145`) with file and line ranges.
+  All 14 pass `tools/validate/validate.py` and agree with `tests/scval_xdr.py`
+  (11 roundtrips byte-for-byte, 3 rejected), and all 14 pass the engine offline
+  (`stellar-canary 0.2.0`, `Protocol-Canary` commit `bc13306`). The pack's
+  CF-04 structural records were regenerated, so `protocol-28/evidence/records/`
+  holds one record per fixture. Closes
+  [issue #361](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/361).
+  ([PR #440])
+
+- `docs/releasing.md`: comprehensive release guide detailing pre-release checks,
+  build and verification commands with real outputs, tag naming and immutability rules,
+  automated vs manual steps, post-release verification, and rollback procedures
+  (issue #339). Linked from `README.md` and `CONTRIBUTING.md`. Closes
+  [issue #339](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/339).
 - `tools/validate/validate.py` and `schemas/fixture-v1.schema.json`: accept
   the lookup and paged RPC methods (`get-ledger-entries`, `get-transaction`,
   `get-ledgers`, `get-transactions`, `get-events`) alongside `get-network`
   and `get-latest-ledger`, and enforce `[request]` table validation according
   to CA-01-K. Closes
   [issue #326](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/326).
+
+- Eleven `protocol-28/xdr/ledger-entry/` fixtures covering the ledger-entry arms
+  that matter to the protocol: `ACCOUNT`, `TRUSTLINE`, `CONTRACT_DATA`,
+  `CONTRACT_CODE` and `TTL`, each with a roundtrip and at least one
+  decode-failure fixture (six in total: four end-of-structure truncations, a
+  contract-code blob cut inside its length prefix, and a trustline whose
+  `TrustLineAsset` discriminant is changed from `ASSET_TYPE_CREDIT_ALPHANUM4`
+  to the undefined value 9). Every payload was produced by the official
+  `stellar-xdr` 28.0.1 crate (features `base64`, `alloc` — `rustc 1.99.1`,
+  generated 2026-10-22 UTC) through a recorded construction expression, never
+  hand-assembled; the same program asserted that `from_xdr_base64` round-trips
+  each valid entry and rejects each invalid one (`failed to fill whole buffer`
+  for the five truncations, `xdr value invalid` for the undefined asset type).
+  Every id, hash, key and balance is a synthetic structural value: the account
+  ids, issuer, contract id, code hash and TTL key hash are fixed placeholders,
+  the contract-code bytes are the four-byte WebAssembly magic used only to
+  exercise the opaque path and are not a WASM module, `example.test` is a
+  documentation domain, and no secret key appears anywhere. Each header cites
+  `Stellar-ledger-entries.x` at `stellar/stellar-xdr` v28.0 (commit
+  `9c9c145`) with file and line ranges, including the extension unions. The
+  independent standard-library codec in `tests/xdr_codec.py` was extended with
+  the five arms and checks all eleven fixtures (5 roundtrips byte-for-byte, 6
+  rejected). All eleven pass `tools/validate/validate.py` and the engine
+  offline (`stellar-canary 0.2.0`, `Protocol-Canary` commit `bc13306`): 5
+  round-trips byte-for-byte, 6 correctly rejected. The pack's CF-04 structural
+  records were regenerated, so `protocol-28/evidence/records/` holds one record
+  per fixture (42). Closes
+  [issue #363](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/363).
+  ([PR #444])
 
 - `tools/pack/archive_digests.py` and `.github/workflows/archive-baseline.yml`:
   a cross-platform baseline for the pack archive (issue #365). Every cell of
@@ -151,6 +444,11 @@ discussion and diff. New entries must include that link; see
   schema and validator remain in sync. Closes
   [issue #344](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/344).
 
+- `tools/validate/check_changelog.py` and pull-request CI workflow job enforcing
+  a CHANGELOG entry under `## [Unreleased]` for changes modifying fixtures
+  (`protocol-*/`), schemas (`schemas/`), or tools (`tools/`) (rule [F-055]),
+  with support for bypassing via the `no-changelog` PR label. Closes
+  [issue #329](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/329).
 - `tools/validate/validate.py` and `schemas/fixture-v1.schema.json` accept
   the `TransactionEnvelope` and `LedgerEntry` XDR type names, matching the
   five variants of `canary-xdr`'s `XdrTypeName` (read at Protocol-Canary
@@ -466,6 +764,15 @@ discussion and diff. New entries must include that link; see
 
 ### Changed
 
+- Hardened contributor and release tooling across four paths: fixture scaffolds
+  now use exclusive creation with failure cleanup; live RPC capture enforces a
+  total response deadline; unsupported schema regexes produce location-aware
+  `SchemaError`s; and registry, evidence, archive and release readers reject
+  duplicate keys, excessive JSON nesting and oversized integers through their
+  existing error paths. Added focused regression coverage without changing
+  fixture data or adding dependencies. Closes issues #457, #456, #455 and #454.
+  ([PR #459](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/459))
+
 - `tools/validate/validate.py` now rejects `expected_base64` on an XDR fixture whose
   `kind` is not `encode-equals`. The field states the expected encoding, and only an
   `encode-equals` fixture has one: `canary-xdr`'s loader accepts "kind", "type" and
@@ -618,6 +925,19 @@ discussion and diff. New entries must include that link; see
 
 ### Known gaps
 
+- **The archive acceptance policy has open questions.** The hostile-archive
+  corpus added in [PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409)
+  (issue
+  [#346](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/346))
+  records five archives that `tools/pack/verify_archive.py` accepts today and
+  that CF-06 does not settle: bytes after the tar end-of-archive markers, a
+  concatenated gzip member, a file at the archive root that is not part of the
+  pack, a file inside the pack directory that is not part of the pack, and a
+  tar header with a wrong magic but a valid checksum. A maintainer has to
+  decide what the contract says about each; the corpus and the verifier are
+  unchanged until then. The corpus is the record of what was observed, not a
+  claim that any of these is exploitable. ([PR #409](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/409))
+
 - **CAP-0086 is not covered.** CAP-0086 (sparse-map host functions) has no
   corresponding top-level XDR type — testing it for real requires a
   deployed Soroban contract that calls
@@ -725,8 +1045,13 @@ discussion and diff. New entries must include that link; see
 [#354]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/354
 [PR #380]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/380
 [PR #381]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/381
+[PR #425]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/425
 [PR #423]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/423
 [PR #424]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/424
 [PR #433]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/433
 [PR #432]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/432
 [PR #431]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/431
+[PR #444]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/444
+[PR #440]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/440
+[PR #439]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/439
+[PR #469]: https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/469

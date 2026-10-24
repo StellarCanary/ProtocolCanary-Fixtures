@@ -76,6 +76,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.common import pack_limits
+from tools.common.json_strict import JSONInputError, load_json
 
 # Extraction limits approved under D-06 (CF-02 section 7, CF-06 section 6).
 MAX_FILES = pack_limits.MAX_FILES
@@ -112,16 +113,22 @@ XDR_KINDS = {"decode-success", "decode-failure", "roundtrip", "encode-equals"}
 # the corresponding method must already exist upstream in canary-rpc.
 RPC_METHODS = {
     "get-events",
+    "get-fee-stats",
+    "get-health",
     "get-latest-ledger",
     "get-ledger-entries",
     "get-ledgers",
     "get-network",
     "get-transaction",
     "get-transactions",
+    "get-version-info",
 }
 _RPC_METHOD_PARAMS: dict[str, dict[str, bool]] = {
     "get-network": {},
     "get-latest-ledger": {},
+    "get-health": {},
+    "get-version-info": {},
+    "get-fee-stats": {},
     "get-ledger-entries": {"keys": True, "xdrFormat": False},
     "get-transaction": {"hash": True, "xdrFormat": False},
     "get-ledgers": {"startLedger": False, "pagination": False, "xdrFormat": False},
@@ -542,14 +549,31 @@ def check_source_reference(value: str) -> str | None:
         return None
 
     parts = urlsplit(value)
-    host = (parts.hostname or "").lower()
+    raw_host = parts.hostname or ""
     segments = [s for s in parts.path.split("/") if s]
-    if not host or "." not in host:
+    if not raw_host or "." not in raw_host:
         return f"has no valid host name in {value!r}"
     if parts.username is not None or parts.password is not None:
         return "must not embed credentials (user@host) in the URL"
 
-    if host in _GITHUB_HOSTS:
+    lower_host = raw_host.lower()
+    if any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789.-" for ch in lower_host):
+        return (
+            "source_reference host must contain only ASCII letters, digits, '.' and '-' "
+            "without empty labels or percent-encoding (non-ASCII hosts must use punycode)"
+        )
+
+    stripped_host = lower_host[:-1] if lower_host.endswith(".") else lower_host
+    labels = stripped_host.split(".")
+    if not stripped_host or any(not label for label in labels):
+        return (
+            "source_reference host must contain only ASCII letters, digits, '.' and '-' "
+            "without empty labels or percent-encoding (non-ASCII hosts must use punycode)"
+        )
+
+    canonical_host = stripped_host
+
+    if canonical_host in _GITHUB_HOSTS:
         if len(segments) < 3:
             return (
                 "points at a GitHub repository root, which follows the default "
@@ -569,7 +593,7 @@ def check_source_reference(value: str) -> str | None:
                     "moves; pin the link to a full commit SHA or a release tag "
                     f"(for example .../{kind}/<40-hex commit>/...)"
                 )
-    elif host == _GITHUB_RAW_HOST:
+    elif canonical_host == _GITHUB_RAW_HOST:
         # /<owner>/<repo>/<ref>/<path...>, or /<owner>/<repo>/refs/(heads|tags)/<name>/...
         if len(segments) < 4:
             return "has no ref and file path; link to a file at a commit or tag"
@@ -2138,6 +2162,10 @@ EVIDENCE_REQUIRED_FIELDS = (
     "outcome",
 )
 EVIDENCE_OPTIONAL_FIELDS = ("network", "endpointHost", "evidenceRef")
+KNOWN_NETWORK_PASSPHRASES = {
+    "Test SDF Network ; September 2015": "Test SDF Network ; September 2015",
+    "Test SDF Future Network ; October 2022": "Test SDF Future Network ; October 2022",
+}
 _EVIDENCE_SHA256_RE = re.compile(r"[0-9a-f]{64}")
 _EVIDENCE_HOST_RE = re.compile(r"[^/:?#@\s\\]+")
 _EVIDENCE_INSTANT_RE = re.compile(
@@ -2315,6 +2343,8 @@ def validate_evidence(record: object, now: datetime | None = None) -> list[str]:
                 problems.append("network.name must be a non-empty string")
             if not _non_empty_str(network.get("passphrase")):
                 problems.append("network.passphrase must be a non-empty string")
+            elif network.get("name") in KNOWN_NETWORK_PASSPHRASES and network["passphrase"] != KNOWN_NETWORK_PASSPHRASES[network["name"]]:
+                problems.append("network.passphrase does not match network.name")
             observed = network.get("observedProtocol")
             if not _is_int(observed) or observed < 0:
                 problems.append("network.observedProtocol must be a non-negative integer")
@@ -2365,9 +2395,12 @@ def validate_evidence_file(
         return None
     report_unsafe_characters(path, text, report)
     try:
-        record = json.loads(text)
-    except json.JSONDecodeError as error:
-        report.error(path, f"not valid JSON: {error}")
+        record = load_json(text, "evidence JSON")
+    except JSONInputError as error:
+        if error.json_error is not None:
+            report.error(path, f"not valid JSON: {error.json_error}")
+        else:
+            report.error(path, f"not valid JSON: {error}")
         return None
     problems = validate_evidence(record, now=now)
     for problem in problems:
