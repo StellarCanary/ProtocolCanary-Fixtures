@@ -728,7 +728,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 rel_path = file_path
         urls = extract_links_from_file(file_path)
         for u in urls:
-            links_to_check.append((u, str(rel_path)))
+            display_path = rel_path.as_posix() if hasattr(rel_path, "as_posix") else str(rel_path)
+            links_to_check.append((u, display_path))
 
     # Sort deterministically
     links_to_check.sort(key=lambda item: (item[1], item[0]))
@@ -778,7 +779,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     summary_file = args.summary_file or os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
         try:
-            with open(summary_file, "a", encoding="utf-8") as fp:
+            with open(summary_file, "a", encoding="utf-8", newline="\n") as fp:
                 fp.write(full_output)
         except OSError as exc:
             sys.stderr.write(f"Warning: could not write to summary file {summary_file}: {exc}\n")

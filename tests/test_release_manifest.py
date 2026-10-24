@@ -353,6 +353,7 @@ class ManifestCliTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=self.root,
         )
         self.assertEqual(run.returncode, 0, run.stderr)
@@ -369,6 +370,7 @@ class ManifestCliTests(unittest.TestCase):
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=self.root,
         )
         self.assertEqual(run.returncode, 1)

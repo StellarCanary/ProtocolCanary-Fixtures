@@ -282,6 +282,7 @@ min = "1"
                     ],
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
                     cwd=work,
                 )
                 if should_load:
