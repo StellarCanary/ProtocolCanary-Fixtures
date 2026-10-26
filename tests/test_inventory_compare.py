@@ -710,6 +710,7 @@ class CommandLineTests(unittest.TestCase):
             [sys.executable, str(COMPARE_PATH), "--help"],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=True,
         )
         self.assertIn("Exit codes", result.stdout)

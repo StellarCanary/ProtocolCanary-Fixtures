@@ -292,6 +292,7 @@ class ToolOutputConsistencyTest(unittest.TestCase):
             cwd=self.repo_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(result.returncode, 0, f"pack.py failed: {result.stderr}")
         archive = os.path.join(dist_dir, "protocolcanary-fixtures-1.0.0.tar.gz")
@@ -309,6 +310,7 @@ class ToolOutputConsistencyTest(unittest.TestCase):
             cwd=self.repo_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=True,
         )
 
@@ -321,6 +323,7 @@ class ToolOutputConsistencyTest(unittest.TestCase):
             cwd=self.repo_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(result.returncode, 0, f"manifest.py failed: {result.stderr}")
         self.assertTrue(os.path.isfile(manifest_path), f"Manifest not found at {manifest_path}")
@@ -337,6 +340,7 @@ class ToolOutputConsistencyTest(unittest.TestCase):
             cwd=self.repo_root,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(result.returncode, 0, f"generate.py failed: {result.stderr}")
         self.assertTrue(
@@ -390,6 +394,7 @@ class BaselineHashTest(unittest.TestCase):
             cwd=_REPO_ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
         self.assertEqual(result.returncode, 0, f"{args[0]} failed: {result.stderr}")
         return result

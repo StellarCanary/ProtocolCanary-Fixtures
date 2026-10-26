@@ -510,6 +510,7 @@ def _run(command: list[str], cwd: Path | None = None) -> subprocess.CompletedPro
         cwd=str(cwd or REPO_ROOT),
         capture_output=True,
         text=True,
+        encoding="utf-8",
     )
 
 

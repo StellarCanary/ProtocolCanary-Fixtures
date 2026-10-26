@@ -110,6 +110,7 @@ class HostileArchiveCorpusTests(unittest.TestCase):
             cwd=str(self.work),
             capture_output=True,
             text=True,
+            encoding="utf-8",
             env=environment,
         )
 
@@ -279,6 +280,7 @@ class CorpusDocumentationTests(unittest.TestCase):
                 cwd=directory,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("fixture(s)", result.stdout)

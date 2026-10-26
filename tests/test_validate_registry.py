@@ -100,6 +100,7 @@ class ValidateRegistryTestCase(unittest.TestCase):
             [sys.executable, str(TOOL_PATH), *args],
             capture_output=True,
             text=True,
+            encoding="utf-8",
         )
 
 
