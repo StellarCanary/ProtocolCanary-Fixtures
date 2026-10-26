@@ -88,7 +88,7 @@ jobs:
           git diff --exit-code -- protocol-28/registry-v1.json protocol-29/registry-v1.json
 
       - name: Repository tests
-        run: python3 -m unittest discover tests -v
+        run: python3 -u -m unittest discover tests -v
 
   validate-matrix:
     # Cross-platform and multi-Python matrix (issue #330). Validates that
@@ -143,7 +143,7 @@ jobs:
         run: python3 tools/badge/badge.py --check
 
       - name: Repository tests
-        run: python3 -m unittest discover tests -v
+        run: python3 -u -m unittest discover tests -v
 
   coverage:
     # Branch coverage of tools/ on a single operating system (ubuntu-latest),
