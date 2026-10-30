@@ -19,6 +19,7 @@ class ProtocolMismatchFixtureTests(unittest.TestCase):
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             check=False,
         )
         self.assertEqual(run.returncode, 0, run.stderr or run.stdout)
@@ -42,6 +43,7 @@ class ProtocolMismatchFixtureTests(unittest.TestCase):
                 cwd=REPO_ROOT,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 check=False,
             )
         self.assertEqual(run.returncode, 1)

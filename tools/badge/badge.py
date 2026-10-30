@@ -140,7 +140,7 @@ def main(argv: list[str]) -> int:
         return 0
 
     if readme != updated:
-        README_PATH.write_text(updated, encoding="utf-8")
+        README_PATH.write_text(updated, encoding="utf-8", newline="\n")
         print(f"OK: README.md fixtures badge updated to {count} fixture file(s)")
     else:
         print(f"OK: README.md fixtures badge already current ({count} fixture file(s))")

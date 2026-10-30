@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +40,27 @@ BEHAVIOR_RESULT_NOT_OBJECT = "result-not-object"
 
 # The passphrase the public Testnet endpoint answers with.
 TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
+
+
+class _MockThreadingHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that ignores socket disconnects during test teardown."""
+
+    daemon_threads = True
+    block_on_close = False
+
+    def handle_error(self, request: object, client_address: object) -> None:
+        _cls, exc, _tb = sys.exc_info()
+        if exc is not None and isinstance(
+            exc, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError)
+        ):
+            return
+        super().handle_error(request, client_address)
+
+    def shutdown_request(self, request: object) -> None:
+        try:
+            super().shutdown_request(request)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            return
 
 
 class MockRpcServer:
@@ -81,10 +103,19 @@ class MockRpcServer:
             protocol_version = "HTTP/1.1"
 
             def do_POST(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's name
-                server._handle(self)
+                try:
+                    server._handle(self)
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                    self.close_connection = True
 
             def log_message(self, *args: object) -> None:
                 """Keep the test output quiet."""
+
+            def handle(self) -> None:
+                try:
+                    super().handle()
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                    self.close_connection = True
 
             def handle_one_request(self) -> None:
                 # A client that gave up (the timeout case) closes the
@@ -92,10 +123,16 @@ class MockRpcServer:
                 # broken pipe is the client's decision, not a server error.
                 try:
                     super().handle_one_request()
-                except (BrokenPipeError, ConnectionResetError):
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
                     self.close_connection = True
 
-        self._server = ThreadingHTTPServer((self.host, self.port), Handler)
+            def finish(self) -> None:
+                try:
+                    super().finish()
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                    pass
+
+        self._server = _MockThreadingHTTPServer((self.host, self.port), Handler)
         self.port = self._server.server_port
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
@@ -103,8 +140,14 @@ class MockRpcServer:
 
     def __exit__(self, *exc: object) -> bool:
         if self._server is not None:
-            self._server.shutdown()
-            self._server.server_close()
+            try:
+                self._server.shutdown()
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                pass
+            try:
+                self._server.server_close()
+            except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+                pass
         if self._thread is not None:
             self._thread.join(timeout=10)
         return False
@@ -139,8 +182,12 @@ class MockRpcServer:
         return {}
 
     def _handle(self, handler: BaseHTTPRequestHandler) -> None:
-        length = int(handler.headers.get("Content-Length") or 0)
-        body = handler.rfile.read(length) if length else b""
+        try:
+            length = int(handler.headers.get("Content-Length") or 0)
+            body = handler.rfile.read(length) if length else b""
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            handler.close_connection = True
+            return
         self.headers.append({key.lower(): value for key, value in handler.headers.items()})
         try:
             request = json.loads(body.decode("utf-8"))
@@ -217,11 +264,14 @@ class MockRpcServer:
 
     @staticmethod
     def _send(handler: BaseHTTPRequestHandler, status: int, payload: bytes) -> None:
-        handler.send_response(status)
-        handler.send_header("Content-Type", "application/json")
-        handler.send_header("Content-Length", str(len(payload)))
-        handler.end_headers()
-        handler.wfile.write(payload)
+        try:
+            handler.send_response(status)
+            handler.send_header("Content-Type", "application/json")
+            handler.send_header("Content-Length", str(len(payload)))
+            handler.end_headers()
+            handler.wfile.write(payload)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            handler.close_connection = True
 
     @staticmethod
     def _send_json(handler: BaseHTTPRequestHandler, document: dict) -> None:

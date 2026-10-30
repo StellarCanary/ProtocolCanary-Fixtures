@@ -211,7 +211,13 @@ def main(argv: list[str]) -> int:
                 # Another process may have created it since the path walk.
                 continue
             created_dirs.append(directory)
-        handle = target_file.open("x", encoding="utf-8")
+        # ``Path.exists()`` is false for a dangling symlink on Windows, but
+        # opening it with ``x`` can follow the link and create its target.
+        # Treat every symlink at the destination as an existing file before
+        # opening, preserving the no-overwrite and no-outside-write contract.
+        if target_file.is_symlink():
+            raise FileExistsError(target_file)
+        handle = target_file.open("x", encoding="utf-8", newline="\n")
         created_file = True
         with handle:
             handle.write(content)

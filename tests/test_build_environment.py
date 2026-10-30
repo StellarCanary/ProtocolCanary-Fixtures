@@ -84,6 +84,7 @@ def _run(
         cwd=str(cwd),
         capture_output=True,
         text=True,
+        encoding="utf-8",
         env=env,
         **extra,
     )

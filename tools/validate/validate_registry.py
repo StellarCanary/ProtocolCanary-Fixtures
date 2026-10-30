@@ -187,7 +187,7 @@ def display_path(path: Path) -> str:
     try:
         return path.resolve().relative_to(REPO_ROOT).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix() if hasattr(path, "as_posix") else str(path).replace("\\", "/")
 
 
 # ---------------------------------------------------------------- checking

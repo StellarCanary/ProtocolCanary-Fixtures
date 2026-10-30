@@ -3873,6 +3873,10 @@ class PortableFixtureNameTests(unittest.TestCase):
             write(root, name, VALID_XDR)
             return validate.validate_directory(root)
 
+    @unittest.skipIf(
+        os.name == "nt",
+        "Windows refuses to create the invalid path names; test_portable_names checks them directly",
+    )
     def test_windows_reserved_device_names_are_rejected(self) -> None:
         for name in (
             "con.toml",
@@ -3890,6 +3894,10 @@ class PortableFixtureNameTests(unittest.TestCase):
                 self.assertIn("non-portable file name", joined)
                 self.assertIn("device name", joined)
 
+    @unittest.skipIf(
+        os.name == "nt",
+        "Windows refuses to create the invalid path names; test_portable_names checks them directly",
+    )
     def test_trailing_dot_or_space_and_forbidden_characters_are_rejected(self) -> None:
         for name in (
             "bad./a.toml",

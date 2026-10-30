@@ -504,7 +504,7 @@ class GoldenManifestTests(unittest.TestCase):
             for entry in load_manifest(name)["fixtures"]:
                 with (pack / entry["path"]).open("rb") as handle:
                     fixture = tomllib.load(handle)
-                directory = str(Path(entry["path"]).parent)
+                directory = Path(entry["path"]).parent.as_posix()
                 referenced = [
                     f"{directory}/{fixture[field]}" if directory != "." else fixture[field]
                     for field in ("input_file", "expected_file")
