@@ -1221,7 +1221,7 @@ class MissingValidatorSectionTests(unittest.TestCase):
         "from pathlib import Path as _Path",
         "",
         "_spec = _importlib.spec_from_file_location(",
-        '    "_standin_real_validate", _Path("__VALIDATE_PATH__"))',
+        '    "_standin_real_validate", _Path(__VALIDATE_PATH__))',
         "assert _spec is not None and _spec.loader is not None",
         "_real = _importlib.module_from_spec(_spec)",
         '_sys.modules["_standin_real_validate"] = _real',
@@ -1248,7 +1248,7 @@ class MissingValidatorSectionTests(unittest.TestCase):
             tmp_path = Path(tmp)
             standin = tmp_path / "validator_minus_rpc_assert_types.py"
             standin.write_text(
-                self.STANDIN.replace("__VALIDATE_PATH__", str(VALIDATE_PATH)),
+                self.STANDIN.replace("__VALIDATE_PATH__", repr(str(VALIDATE_PATH))),
                 encoding="utf-8",
             )
             module = ValidatorConstantTests.load(

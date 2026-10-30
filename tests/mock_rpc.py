@@ -45,6 +45,9 @@ TESTNET_PASSPHRASE = "Test SDF Network ; September 2015"
 class _MockThreadingHTTPServer(ThreadingHTTPServer):
     """ThreadingHTTPServer that ignores socket disconnects during test teardown."""
 
+    daemon_threads = True
+    block_on_close = False
+
     def handle_error(self, request: object, client_address: object) -> None:
         _cls, exc, _tb = sys.exc_info()
         if exc is not None and isinstance(
@@ -52,6 +55,12 @@ class _MockThreadingHTTPServer(ThreadingHTTPServer):
         ):
             return
         super().handle_error(request, client_address)
+
+    def shutdown_request(self, request: object) -> None:
+        try:
+            super().shutdown_request(request)
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
+            return
 
 
 class MockRpcServer:

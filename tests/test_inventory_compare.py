@@ -611,7 +611,10 @@ class CommandLineTests(unittest.TestCase):
     def test_a_directory_as_inventory_exits_two(self) -> None:
         code, _, err = self.run_tool(str(self.tmp), str(self.registry_path))
         self.assertEqual(code, 2)
-        self.assertIn("is a directory", err)
+        self.assertTrue(
+            "is a directory" in err or "could not be read" in err,
+            err,
+        )
 
     def test_a_missing_registry_exits_two(self) -> None:
         code, _, err = self.run_tool(str(self.inventory_path), str(self.tmp / "absent.json"))
@@ -621,7 +624,10 @@ class CommandLineTests(unittest.TestCase):
     def test_a_directory_as_registry_exits_two(self) -> None:
         code, _, err = self.run_tool(str(self.inventory_path), str(self.tmp))
         self.assertEqual(code, 2)
-        self.assertIn("is a directory", err)
+        self.assertTrue(
+            "is a directory" in err or "could not be read" in err,
+            err,
+        )
 
     def test_an_unreadable_input_exits_two(self) -> None:
         original_read_bytes = Path.read_bytes

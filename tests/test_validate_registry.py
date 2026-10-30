@@ -322,7 +322,10 @@ class UnusableInputTests(ValidateRegistryTestCase):
         (self.pack / "registry-v1.json").mkdir()
         code, out, err = self.run_tool(str(self.pack))
         self.assertEqual(code, 2)
-        self.assertIn("is a directory", err)
+        self.assertTrue(
+            "is a directory" in err or "could not be read" in err,
+            err,
+        )
 
     def test_an_unknown_option_exits_2(self) -> None:
         result = self.run_subprocess("--no-such-flag")

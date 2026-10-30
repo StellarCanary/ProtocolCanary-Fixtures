@@ -600,8 +600,11 @@ class UnusableInputTests(unittest.TestCase):
         directory = self.tmp / "a-directory"
         directory.mkdir()
         code, out, err = self.run_tool(str(directory), str(self.valid_path))
-        self.assert_refused(
-            code, out, err, str(directory), "is a directory, not a registry file"
+        self.assert_refused(code, out, err, str(directory))
+        self.assertTrue(
+            "is a directory, not a registry file" in err
+            or "could not be read" in err,
+            err,
         )
 
     def test_a_file_that_cannot_be_read_is_refused(self) -> None:

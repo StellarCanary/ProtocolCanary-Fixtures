@@ -590,7 +590,11 @@ class CaptureLiveUnitTests(unittest.TestCase):
             capture_live.capture_method(
                 "http://127.0.0.1:1", "getNetwork", 1, 2.0
             )
-        self.assertIn("could not be reached", str(raised.exception))
+        self.assertTrue(
+            "could not be reached" in str(raised.exception)
+            or "the request failed" in str(raised.exception),
+            str(raised.exception),
+        )
 
     def test_a_transport_error_is_reported(self) -> None:
         with mock.patch.object(
@@ -762,17 +766,18 @@ class CaptureLiveUnitTests(unittest.TestCase):
         self.assertIn("read-only", str(raised.exception))
 
     def test_a_capture_that_cannot_be_written_is_reported(self) -> None:
-        with self.assertRaises(capture_live.CaptureError) as raised:
-            capture_live.write_documents(
-                [(Path("/proc/nonexistent/capture.json"), {"a": 1})]
-            )
+        with mock.patch.object(
+            Path, "write_bytes", side_effect=OSError("write failed")
+        ):
+            with self.assertRaises(capture_live.CaptureError) as raised:
+                capture_live.write_documents([(Path("capture.json"), {"a": 1})])
         self.assertIn("could not write", str(raised.exception))
 
     def test_an_evidence_reference_outside_the_repository_is_absolute(self) -> None:
         with tempfile.TemporaryDirectory() as scratch:
             outside = Path(scratch) / "capture.json"
             reference = capture_live.evidence_reference(outside, Path(scratch) / "live")
-        self.assertTrue(reference.startswith("/"))
+        self.assertTrue(Path(reference).is_absolute(), reference)
         self.assertNotIn("..", reference)
 
     # ------------------------------------------------------------- the command

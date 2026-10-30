@@ -82,7 +82,7 @@ class PackLimitsValidationTests(unittest.TestCase):
         needed_padding = limit - base_len
         padded_content = make_valid_fixture("p28-xdr-ok", extra_comment_bytes=needed_padding)
         self.assertEqual(len(padded_content.encode("utf-8")), limit)
-        ok_file.write_text(padded_content, encoding="utf-8")
+        ok_file.write_text(padded_content, encoding="utf-8", newline="\n")
 
         report = validate.validate_directory(self.root)
         self.assertEqual(report.errors, [])
@@ -91,7 +91,7 @@ class PackLimitsValidationTests(unittest.TestCase):
         bad_file = self.root / "xdr" / "bad.toml"
         padded_bad = padded_content + " "
         self.assertEqual(len(padded_bad.encode("utf-8")), limit + 1)
-        bad_file.write_text(padded_bad, encoding="utf-8")
+        bad_file.write_text(padded_bad, encoding="utf-8", newline="\n")
 
         # Track bytes read to confirm bounded read (did not read more than limit + 1)
         real_open = open
@@ -128,7 +128,9 @@ class PackLimitsValidationTests(unittest.TestCase):
         dir_8 = self.root.joinpath(*segs_8)
         dir_8.mkdir(parents=True, exist_ok=True)
         file_8 = dir_8 / "f.toml"
-        file_8.write_text(make_valid_fixture("p28-xdr-depth8"), encoding="utf-8")
+        file_8.write_text(
+            make_valid_fixture("p28-xdr-depth8"), encoding="utf-8", newline="\n"
+        )
 
         # Path relative to root: d1/d2/d3/d4/d5/d6/d7/f.toml -> 8 segments
         rel_8 = file_8.relative_to(self.root).as_posix()
@@ -147,7 +149,9 @@ class PackLimitsValidationTests(unittest.TestCase):
         dir_9 = self.root.joinpath(*segs_9)
         dir_9.mkdir(parents=True, exist_ok=True)
         file_9 = dir_9 / "deep.toml"
-        file_9.write_text(make_valid_fixture("p28-xdr-depth9"), encoding="utf-8")
+        file_9.write_text(
+            make_valid_fixture("p28-xdr-depth9"), encoding="utf-8", newline="\n"
+        )
 
         rel_9 = file_9.relative_to(self.root).as_posix()
         self.assertEqual(len(rel_9.split("/")), 9)
@@ -173,14 +177,20 @@ class PackLimitsValidationTests(unittest.TestCase):
         try:
             pack_limits.MAX_FILES = 2
             # 2 files accepted
-            (self.root / "f1.toml").write_text(make_valid_fixture("p28-xdr-f1"), encoding="utf-8")
-            (self.root / "f2.toml").write_text(make_valid_fixture("p28-xdr-f2"), encoding="utf-8")
+            (self.root / "f1.toml").write_text(
+                make_valid_fixture("p28-xdr-f1"), encoding="utf-8", newline="\n"
+            )
+            (self.root / "f2.toml").write_text(
+                make_valid_fixture("p28-xdr-f2"), encoding="utf-8", newline="\n"
+            )
 
             report = validate.validate_directory(self.root)
             self.assertEqual(report.errors, [])
 
             # 3 files rejected (reported once per root)
-            (self.root / "f3.toml").write_text(make_valid_fixture("p28-xdr-f3"), encoding="utf-8")
+            (self.root / "f3.toml").write_text(
+                make_valid_fixture("p28-xdr-f3"), encoding="utf-8", newline="\n"
+            )
             report_3 = validate.validate_directory(self.root)
             count_errors = [e for e in report_3.error_entries if "file limit" in e.message]
             self.assertEqual(len(count_errors), 1)
@@ -196,7 +206,9 @@ class PackLimitsValidationTests(unittest.TestCase):
             size = len(fixture_text.encode("utf-8"))
             pack_limits.MAX_TOTAL_BYTES = size
 
-            (self.root / "f1.toml").write_text(fixture_text, encoding="utf-8")
+            (self.root / "f1.toml").write_text(
+                fixture_text, encoding="utf-8", newline="\n"
+            )
             report = validate.validate_directory(self.root)
             self.assertEqual(report.errors, [])
 
@@ -211,7 +223,9 @@ class PackLimitsValidationTests(unittest.TestCase):
             pack_limits.MAX_TOTAL_BYTES = original
 
     def test_non_member_file_larger_than_limit_ignored(self) -> None:
-        (self.root / "f1.toml").write_text(make_valid_fixture("p28-xdr-nonmember"), encoding="utf-8")
+        (self.root / "f1.toml").write_text(
+            make_valid_fixture("p28-xdr-nonmember"), encoding="utf-8", newline="\n"
+        )
         # 2 MB README.md outside pack
         readme = self.root / "README.md"
         readme.write_bytes(b"#" * (2 * 1024 * 1024))
@@ -220,7 +234,9 @@ class PackLimitsValidationTests(unittest.TestCase):
         self.assertEqual(report.errors, [])
 
     def test_oversized_file_under_git_ignored(self) -> None:
-        (self.root / "f1.toml").write_text(make_valid_fixture("p28-xdr-git"), encoding="utf-8")
+        (self.root / "f1.toml").write_text(
+            make_valid_fixture("p28-xdr-git"), encoding="utf-8", newline="\n"
+        )
         git_dir = self.root / ".git"
         git_dir.mkdir(parents=True, exist_ok=True)
         (git_dir / "big.bin").write_bytes(b"#" * (2 * 1024 * 1024))
@@ -247,7 +263,9 @@ class PackLimitsValidationTests(unittest.TestCase):
             'value_base64 = "EREREREREREREREREREREREREREREREREREREREREREAAAAAaOd4AAAAAAAAAAAA"\n'
             'input_file = "input.bin"\n'
         )
-        (self.root / "xdr" / "fixture.toml").write_text(fixture, encoding="utf-8")
+        (self.root / "xdr" / "fixture.toml").write_text(
+            fixture, encoding="utf-8", newline="\n"
+        )
 
         report = validate.validate_directory(self.root)
         errors = [e.message for e in report.error_entries]
@@ -260,7 +278,9 @@ class PackLimitsValidationTests(unittest.TestCase):
         long_seg = "a" * 100
         path_8 = self.root / "d1" / "d2" / "d3" / "d4" / "d5" / "d6" / long_seg / "f.toml"
         path_8.parent.mkdir(parents=True, exist_ok=True)
-        path_8.write_text(make_valid_fixture("p28-xdr-longseg"), encoding="utf-8")
+        path_8.write_text(
+            make_valid_fixture("p28-xdr-longseg"), encoding="utf-8", newline="\n"
+        )
 
         report = validate.validate_directory(self.root)
         depth_errors = [e for e in report.error_entries if "deeper than" in e.message]
@@ -269,7 +289,9 @@ class PackLimitsValidationTests(unittest.TestCase):
     def test_member_grows_between_stat_and_read(self) -> None:
         file_path = self.root / "xdr" / "growing.toml"
         file_path.parent.mkdir(parents=True, exist_ok=True)
-        file_path.write_text(make_valid_fixture("p28-xdr-grow"), encoding="utf-8")
+        file_path.write_text(
+            make_valid_fixture("p28-xdr-grow"), encoding="utf-8", newline="\n"
+        )
 
         class FakeStat:
             st_size = 100

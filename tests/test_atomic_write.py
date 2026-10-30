@@ -176,13 +176,24 @@ class FailureSafetyTest(unittest.TestCase):
         path = Path(self.dir) / "close-test.txt"
         write_bytes_atomic(path, b"original")
 
+        real_close = os.close
+        close_calls = 0
+
+        def fail_once(fd: int) -> None:
+            nonlocal close_calls
+            close_calls += 1
+            if close_calls == 1:
+                raise OSError("close failed")
+            real_close(fd)
+
         with mock.patch(
             "tools.common.atomic_write.os.close",
-            side_effect=OSError("close failed"),
+            side_effect=fail_once,
         ):
             with self.assertRaises(OSError):
                 write_bytes_atomic(path, b"new data")
 
+        self.assertGreaterEqual(close_calls, 2)
         self.assertEqual(path.read_bytes(), b"original")
         self.assertEqual(_temp_files(self.dir), [])
 
