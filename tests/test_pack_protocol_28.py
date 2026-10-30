@@ -46,6 +46,9 @@ EXPECTED_IDS_BY_SURFACE = {
         "p28-xdr-stellar-value-signed-roundtrip",
         "p28-xdr-stellar-value-signed-decode-success",
         "p28-xdr-stellar-value-signed-decode-failure",
+        "p28-xdr-stellar-value-boundary-truncated",
+        "p28-xdr-stellar-value-boundary-trailing-bytes",
+        "p28-xdr-stellar-value-boundary-unknown-ext-discriminant",
         "p28-xdr-transaction-envelope-v0-roundtrip",
         "p28-xdr-transaction-envelope-v0-decode-failure",
         "p28-xdr-transaction-envelope-v1-roundtrip",
@@ -200,6 +203,11 @@ class Protocol28PackTests(unittest.TestCase):
     def test_protocol_27_pack_has_no_fixtures_yet(self) -> None:
         p27 = REPO_ROOT / "protocol-27"
         self.assertEqual(validate.find_fixture_files(p27), [])
+        readme = p27 / "README.md"
+        self.assertTrue(
+            readme.is_file() and "intentionally empty" in readme.read_text(encoding="utf-8").lower(),
+            "protocol-27/README.md must state the pack is intentionally empty",
+        )
 
         # protocol-27/README.md documents the pack as intentionally empty as a
         # matter of policy (no placeholder fixtures). The *.toml-only check

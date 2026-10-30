@@ -12,6 +12,65 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- A JSON Schema for the `--format json` report the validator prints (#333).
+  `schemas/validator-report-v1.schema.json` describes the F-023 document --
+  the `valid` flag, the `errors` and `warnings` diagnostics (`path`, `id`,
+  `line`, `message`) and the derived `summary` counters -- and
+  `tests/test_schema.py` validates real output from passing, failing and
+  warning runs of `python3 tools/validate/validate.py --format json` against
+  it with `tools/validate/jsonschema_lite.py`, together with negative cases
+  for a
+  missing required field, a wrong type, an incomplete diagnostic and an
+  unknown extra property. See
+  [PR #477](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/477).
+- Protocol 27 pack `protocol-27/` is now documented instead of silently empty:
+  `protocol-27/README.md` and `docs/protocol-27.md` explain why the pack has
+  no fixtures yet (CAP-0071-01 and CAP-0071-02 are authorization-semantics
+  changes, not new top-level XDR types, and no fixture has yet been verified
+  against an authoritative upstream source for this repository's evidence
+  standard). Tests asserting the gap live in `tests/test_pack_protocol_27.py`.
+  ([PR #480](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/480))
+
+### Changed
+
+- RPC contract coverage now completes F-020 (#282): `[request]` is described
+  in the JSON Schema, `field-one-of` and the engine-supported `integer`
+  `field-type` are validated and evaluated by the live-capture verifier; the
+  engine vocabulary is pinned to Protocol-Canary commit
+  `cf4d7e7a5338b1513694711796236a04a0f312b2`. The
+  contract's `field-range` wording is represented by the engine's actual
+  `field-number-range` parser name, so the validator cannot accept a fixture
+  the engine rejects. See [issue #282](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/282).
+- Five unredacted, offline structural response vectors now cover the supported
+  live Testnet RPC methods required by F-042 (#299): `getNetwork`,
+  `getLatestLedger`, `getVersionInfo`, `getHealth` and `getFeeStats`, with
+  positive shape checks and negative mutations. See
+  [issue #299](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/299).
+- ScVal recursion vectors now cover empty Vec/Map values, nested Vec/Map/
+  Address structures, integer boundaries, malformed recursive payloads and a
+  caller-configured `stellar-xdr 28.0.1` depth boundary. The vectors explicitly
+  record that `Limits::none()` is unlimited rather than inventing a depth-8
+  protocol rule. See
+  [issue #303](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/303).
+  ([PR #480](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/480))
+
+- Three StellarValue decode-failure boundary fixtures (#340), in the new
+  `protocol-28/xdr/boundaries/` directory:
+  `p28-xdr-stellar-value-boundary-truncated` (a truncation at 44 of 48 bytes,
+  cutting off the ext discriminant),
+  `p28-xdr-stellar-value-boundary-trailing-bytes` (a complete value with one
+  4-byte zero word appended) and
+  `p28-xdr-stellar-value-boundary-unknown-ext-discriminant` (the ext
+  discriminant changed from 0 to the undefined 3) — the three standard ways
+  an XDR decoder is expected to fail, none of which the pack's StellarValue
+  fixtures covered. Every payload is derived from a crate-produced encoding
+  by the byte rule its header records, with the exact `cargo` generation
+  command and the `stellar-xdr` 28.0.1 crate version stated in each header;
+  the crate rejects all three, and `stellar-canary` 0.2.0 reports 3 of 3
+  correctly rejected (2026-10-26 UTC). Pack README table, fixture-count
+  badge and `docs/protocol-28.md` updated. See
+  [#340](https://github.com/StellarCanary/ProtocolCanary-Fixtures/issues/340).
+
 - Every job in `validate.yml`, `engine-drift.yml` and `live-evidence.yml` now
   sets `timeout-minutes` (F-133), so a hung connection or a stuck build cannot
   hold a runner for GitHub's 360-minute default and block the next scheduled
