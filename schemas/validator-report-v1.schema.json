@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/StellarCanary/ProtocolCanary-Fixtures/main/schemas/validator-report-v1.schema.json",
+  "title": "ProtocolCanary-Fixtures Validator Report",
+  "description": "Schema for the JSON report printed by `python3 tools/validate/validate.py --format json` (F-023). Key order at each level is part of the report format but is not enforced by this schema.",
+  "type": "object",
+  "properties": {
+    "valid": {
+      "type": "boolean",
+      "description": "Mirrors the exit code: true when the run would exit 0."
+    },
+    "errors": {
+      "type": "array",
+      "description": "Validation errors, in report order. Empty when valid is true.",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Validation warnings, in report order. May be non-empty even when valid is true.",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Counts derived from the document itself, never maintained separately.",
+      "properties": {
+        "roots": {
+          "type": "array",
+          "description": "The root directories that were validated, in argument order.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fixtures": {
+          "type": "integer",
+          "description": "Number of *.toml fixture files discovered across all roots."
+        },
+        "errors": {
+          "type": "integer",
+          "description": "Length of the top-level errors array."
+        },
+        "warnings": {
+          "type": "integer",
+          "description": "Length of the top-level warnings array."
+        }
+      },
+      "required": ["roots", "fixtures", "errors", "warnings"],
+      "additionalProperties": true
+    }
+  },
+  "required": ["valid", "errors", "warnings", "summary"],
+  "additionalProperties": true,
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "description": "One error or warning. The four keys are always present; null means the value is genuinely unknown.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Path to the file or directory that produced the diagnostic."
+        },
+        "id": {
+          "type": ["string", "null"],
+          "description": "Fixture id, or null when the diagnostic is not tied to a fixture."
+        },
+        "line": {
+          "type": ["integer", "null"],
+          "description": "1-based line number in the offending file, or null when it is not known."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable diagnostic message."
+        }
+      },
+      "required": ["path", "id", "line", "message"],
+      "additionalProperties": true
+    }
+  }
+}

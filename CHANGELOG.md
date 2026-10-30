@@ -12,6 +12,17 @@ discussion and diff. New entries must include that link; see
 
 ### Added
 
+- A JSON Schema for the `--format json` report the validator prints (#333).
+  `schemas/validator-report-v1.schema.json` describes the F-023 document --
+  the `valid` flag, the `errors` and `warnings` diagnostics (`path`, `id`,
+  `line`, `message`) and the derived `summary` counters -- and
+  `tests/test_schema.py` validates real output from passing, failing and
+  warning runs of `python3 tools/validate/validate.py --format json` against
+  it with `tools/validate/jsonschema_lite.py`, together with negative cases
+  for a
+  missing required field, a wrong type, an incomplete diagnostic and an
+  unknown extra property. See
+  [PR #477](https://github.com/StellarCanary/ProtocolCanary-Fixtures/pull/477).
 - Protocol 27 pack `protocol-27/` is now documented instead of silently empty:
   `protocol-27/README.md` and `docs/protocol-27.md` explain why the pack has
   no fixtures yet (CAP-0071-01 and CAP-0071-02 are authorization-semantics
