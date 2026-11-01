@@ -627,9 +627,12 @@ class CaptureLiveUnitTests(unittest.TestCase):
             capture_live.capture_method(
                 "http://127.0.0.1:1", "getNetwork", 1, 2.0
             )
+        # An unused loopback port may refuse immediately or time out,
+        # depending on the host networking stack (notably Windows CI).
         self.assertTrue(
             "could not be reached" in str(raised.exception)
-            or "the request failed" in str(raised.exception),
+            or "the request failed" in str(raised.exception)
+            or "did not answer within" in str(raised.exception),
             str(raised.exception),
         )
 
