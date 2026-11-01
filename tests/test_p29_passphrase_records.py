@@ -22,7 +22,9 @@ class Protocol29PassphraseRecordTests(unittest.TestCase):
         ]
         for path in evidence:
             command.extend(["--evidence", str(path)])
-        return subprocess.run(command, cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+        return subprocess.run(
+            command, cwd=REPO_ROOT, capture_output=True, text=True, encoding="utf-8", check=False
+        )
 
     def test_records_are_valid_and_keep_network_passphrases_distinct(self) -> None:
         testnet = RECORDS / "testnet" / "p29-rpc-network-mismatch.json"

@@ -518,7 +518,7 @@ class ReadOnlyTests(unittest.TestCase):
 
             def digest() -> dict[str, str]:
                 return {
-                    str(p.relative_to(pack)): hashlib.sha256(p.read_bytes()).hexdigest()
+                    p.relative_to(pack).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                     for p in sorted(pack.rglob("*"))
                     if p.is_file()
                 }
@@ -530,7 +530,7 @@ class ReadOnlyTests(unittest.TestCase):
             self.assertEqual(digest(), before)
             # ... and no new files appeared (no __pycache__, no manifest).
             self.assertEqual(
-                sorted(str(p.relative_to(pack)) for p in pack.rglob("*") if p.is_file()),
+                sorted(p.relative_to(pack).as_posix() for p in pack.rglob("*") if p.is_file()),
                 sorted(before),
             )
 
@@ -1225,7 +1225,7 @@ class MissingValidatorSectionTests(unittest.TestCase):
         "from pathlib import Path as _Path",
         "",
         "_spec = _importlib.spec_from_file_location(",
-        '    "_standin_real_validate", _Path("__VALIDATE_PATH__"))',
+        '    "_standin_real_validate", _Path(__VALIDATE_PATH__))',
         "assert _spec is not None and _spec.loader is not None",
         "_real = _importlib.module_from_spec(_spec)",
         '_sys.modules["_standin_real_validate"] = _real',
@@ -1252,7 +1252,7 @@ class MissingValidatorSectionTests(unittest.TestCase):
             tmp_path = Path(tmp)
             standin = tmp_path / "validator_minus_rpc_assert_types.py"
             standin.write_text(
-                self.STANDIN.replace("__VALIDATE_PATH__", str(VALIDATE_PATH)),
+                self.STANDIN.replace("__VALIDATE_PATH__", repr(str(VALIDATE_PATH))),
                 encoding="utf-8",
             )
             module = ValidatorConstantTests.load(

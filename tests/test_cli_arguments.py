@@ -24,6 +24,7 @@ class SchemaSyncArgumentTests(unittest.TestCase):
             [sys.executable, str(SCHEMA_SYNC_PATH), *args],
             capture_output=True,
             text=True,
+            encoding="utf-8",
             cwd=REPO_ROOT,
         )
 

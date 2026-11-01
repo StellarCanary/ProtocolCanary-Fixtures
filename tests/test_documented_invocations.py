@@ -60,7 +60,7 @@ def extract_commands() -> list[dict]:
             rest = match.group("rest") or ""
             full_cmd = f"stellar-canary check --fixtures-dir {dir_value} {rest}".strip()
             commands.append({
-                "doc": str(doc_path.relative_to(REPO_ROOT)),
+                "doc": doc_path.relative_to(REPO_ROOT).as_posix(),
                 "dir": dir_value,
                 "rest": rest.strip(),
                 "full_cmd": full_cmd,
@@ -180,6 +180,7 @@ class EngineInvocationTests(unittest.TestCase):
                 [self.engine_bin, "check", "--help"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 timeout=10,
             ).stdout
             if "--offline" not in help_out:
@@ -193,6 +194,7 @@ class EngineInvocationTests(unittest.TestCase):
                 [self.engine_bin, "--version"],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 timeout=10,
             ).stdout.strip()
             print(f"Engine version: {version_out}")
@@ -220,7 +222,9 @@ class EngineInvocationTests(unittest.TestCase):
                 "--no-cache",
                 "--json",
             ] + extra_args
-            return subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=60)
+            return subprocess.run(
+                cmd, cwd=work, capture_output=True, text=True, encoding="utf-8", timeout=60
+            )
 
     def test_documented_commands_do_not_exit_4(self) -> None:
         """Each documented command should not exit with code 4 (invalid fixture)."""

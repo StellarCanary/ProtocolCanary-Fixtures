@@ -335,7 +335,7 @@ def run_compare(
     print(text)
     if summary_file is not None:
         summary_file.parent.mkdir(parents=True, exist_ok=True)
-        summary_file.write_text(text + "\n", encoding="utf-8")
+        summary_file.write_text(text + "\n", encoding="utf-8", newline="\n")
 
     if failures:
         for failure in failures:
@@ -432,7 +432,7 @@ def main(argv: list[str]) -> int:
         sys.stdout.write(document)
         if args.output is not None:
             args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(document, encoding="utf-8")
+            args.output.write_text(document, encoding="utf-8", newline="\n")
         stream_path = args.stream
         if stream_path is None and args.output is not None:
             stream_path = args.output.parent / STREAM_NAME
