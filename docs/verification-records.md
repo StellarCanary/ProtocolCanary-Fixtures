@@ -75,11 +75,13 @@ The check that produced them is the one the CI runs, and it was actually run:
 
 ```console
 $ python3 tools/evidence/record_structural.py protocol-28
-OK: wrote 31 record(s) at 2026-10-22T06:44:39Z
+OK: wrote 93 record(s) at 2026-10-22T06:44:39Z
   protocol-28/evidence/records/p28-rpc-latest-ledger.json
   protocol-28/evidence/records/p28-rpc-network.json
   ...
 ```
+
+*(Note: the tool writes one record per fixture in the pack; the historical snapshot from 2026-10-22 originally produced 31 records before subsequent fixtures were added).*
 
 The tool refuses to write anything when a fixture does not validate, so a
 record always says that the check passed.
@@ -113,8 +115,10 @@ The validator accepts them, and the CI checks that it does:
 
 ```console
 $ python3 tools/validate/validate.py --evidence protocol-28/evidence/records
-OK: 31 fixture file(s) valid across 3 root(s); 31 evidence record(s) valid
+OK: 98 fixture file(s) valid across 4 root(s); 93 evidence record(s) valid
 ```
+
+*(Historical initial snapshot from 2026-10-22 reported `OK: 31 fixture file(s) valid across 3 root(s); 31 evidence record(s) valid` against the initial 31-fixture set).*
 
 `tests/test_verification_records.py` pins the rules above down: every fixture
 has exactly one record, every record's hash is the hash of the file that is
