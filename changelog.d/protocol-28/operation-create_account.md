@@ -1,0 +1,1 @@
+- Add a Protocol 28 TransactionEnvelope V1 fixture covering the CREATE_ACCOUNT operation arm with boundary startingBalance.

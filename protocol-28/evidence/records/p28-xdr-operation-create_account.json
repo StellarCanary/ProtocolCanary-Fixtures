@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-operation-create_account",
+  "fixtureSha256": "3e27cc664f46557bf8a3ba00e0f6505f423ef0a52df40ea6771b9f38fad5c8f4",
+  "method": "structural",
+  "checkedAt": "2026-11-20T13:59:27Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}
