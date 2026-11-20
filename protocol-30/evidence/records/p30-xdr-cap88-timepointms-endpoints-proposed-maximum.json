@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p30-xdr-cap88-timepointms-endpoints-proposed-maximum",
+  "fixtureSha256": "75f94974c447e47f94c82b2246fc99782e3335e216747abb567dc053f82173c6",
+  "method": "structural",
+  "checkedAt": "2026-11-20T13:40:04Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

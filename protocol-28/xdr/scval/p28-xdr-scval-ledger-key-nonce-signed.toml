@@ -1,0 +1,47 @@
+# Protocol 28 / ScVal: an `SCV_LEDGER_KEY_NONCE` carries a signed int64 nonce.
+#
+# What this tests:
+# the `SCV_LEDGER_KEY_NONCE` arm carrying `SCNonceKey { nonce: -1 }`: discriminant 21 followed by a signed int64 whose 64 bits are all set.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct SCNonceKey { int64 nonce; };` -- Stellar-contract.x lines 240-242.
+#   * `case SCV_LEDGER_KEY_NONCE: SCNonceKey nonce_key;` -- lines 309-310.
+#   * `enum SCValType` -- Stellar-contract.x lines 26-81; `union SCVal` -- lines 254-316.
+#
+# Why it matters:
+# SCNonceKey is a single signed int64, not an address plus an unsigned nonce. A decoder that kept the older address-prefixed layout would consume the wrong number of bytes and could never produce a negative nonce. The -1 value makes the sign extension visible in all eight payload bytes.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a
+# decoder must accept this value and re-encoding it must reproduce
+# value_base64 byte for byte, not merely an equal value. The payload was
+# produced by a program that builds the typed value with the official
+# `stellar-xdr 28.0.1` crate (features base64 and alloc -- the crate version
+# Protocol-Canary's canary-xdr pins for Protocol 28) and serialises it
+# with to_xdr_base64(Limits::none()), never hand-assembled. Generation
+# expression, recorded verbatim:
+#
+#   ScVal::LedgerKeyNonce(ScNonceKey { nonce: -1 })
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (3acc79c0c 2026-11-05); generated 2026-11-20 (UTC). The same program asserted the crate's own round trip: from_xdr_base64 returned Ok and re-encoding the decoded value reproduced the encoding exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes, which are quoted
+# in full in the fixture.
+#
+# Every payload byte is a synthetic structural value, not a capture of a real network object: the fixed bytes are arbitrary sentinels chosen by the generator, no account key, contract id, signature or secret key is a real one, and nothing here was observed on a network. This internal ScVal layout is structural only; it is not a claim that the Soroban host accepts it as a contract argument or return value.
+#
+# The XDR definition cited below is the pinned file, not a moving branch.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x
+
+id = "p28-xdr-scval-ledger-key-nonce-signed"
+protocol = 28
+surface = "xdr"
+category = "scval"
+description = "A signed `ScVal::LedgerKeyNonce` with nonce -1 round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x"
+
+type = "ScVal"
+kind = "roundtrip"
+value_base64 = "AAAAFf//////////"

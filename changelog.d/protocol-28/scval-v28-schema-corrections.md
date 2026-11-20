@@ -1,0 +1,1 @@
+- Correct the independent ScVal codec and parity vectors to the pinned Protocol 28 XDR: SCError discriminants, `SCContractInstance.storage` as an `SCMap` pointer, `SCNonceKey` as a signed `int64`, `SCV_EXECUTABLE_TAG` as an `SCString`, and the muxed-account, claimable-balance and liquidity-pool `SCAddress` arms, with structural pack fixtures for each corrected layout.

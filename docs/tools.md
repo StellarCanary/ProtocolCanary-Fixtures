@@ -91,9 +91,6 @@ python3 tools/pack/verify_archive.py [--sha256 HEX] [--manifest PATH] archive
 ## `tools/pack/archive_digests.py`
 
 Measures the archive's two digests and compares them across cells (issue #365, `docs/archive-reproducibility.md`). Builds the archive with `tools/pack/pack.py` and only reads the bytes back; it never changes the archive format or the compression settings.
-## `tools/evidence/record_structural.py`
-
-Writes CF-04 verification records for the structural check of a pack (issue #366, `docs/verification-records.md`). Runs the structural validation, then writes one record per fixture with the SHA-256 of the fixture file, the instant the check ran and `method: "structural"`. It writes nothing when a fixture does not validate, never derives an instant from a header comment, and never records a live observation.
 
 ### Synopsis
 
@@ -102,9 +99,9 @@ python3 tools/pack/archive_digests.py build [--pack PACK] [--version VERSION]
     [--output PATH] [--stream PATH] [--cell NAME]
 python3 tools/pack/archive_digests.py compare --results DIR
     [--expected-cell CELL] [--expected-matrix JSON] [--summary-file PATH]
-python3 tools/evidence/record_structural.py PACK [--output-dir DIR]
-    [--verifier-version VERSION] [--dry-run]
 ```
+
+A subcommand (`build` or `compare`) is required.
 
 ### Options
 
@@ -114,7 +111,7 @@ python3 tools/evidence/record_structural.py PACK [--output-dir DIR]
 - `--pack PACK`: pack directory to build (default: `protocol-28`)
 - `--version VERSION`: release version used to name the archive (default: `0.0.0`)
 - `--output PATH`: also write the result document here (default: stdout only)
-- `--stream PATH`: also write the uncompressed tar stream here (default: `stream.tar` next to `--output`)
+- `--stream PATH`: also write the uncompressed tar stream here (default: `stream.tar` next to `--output`; not written when neither option is given)
 - `--cell NAME`: the name of the cell this measurement was made in (default: the platform and Python version)
 
 `compare`:
@@ -124,6 +121,35 @@ python3 tools/evidence/record_structural.py PACK [--output-dir DIR]
 - `--expected-cell CELL`: a cell that must be present; may be given more than once
 - `--expected-matrix JSON`: the matrix the cells come from, as JSON (`{"os": [...], "python": [...]}`); every cell it names must be present
 - `--summary-file PATH`: also write the report here (for example `$GITHUB_STEP_SUMMARY`)
+
+### Exit Codes
+
+| Exit Code | Meaning |
+|---|---|
+| `0` | Success: the digests were measured (`build`), or the cells agree on the uncompressed tar-stream digest (`compare`). |
+| `1` | `build`: the archive could not be built or read back. `compare`: the uncompressed digests differ between cells, an expected cell produced no digest document, there are more cells than the declared matrix, or a result document is unreadable. |
+| `2` | Command-line syntax error: no subcommand, missing `--results`, unknown options, or `--expected-matrix` that is not valid JSON or not a JSON object. |
+
+### Output Streams
+
+- **stdout**: the JSON result document (`build`) or the markdown table and report (`compare`); help text when `--help` is invoked.
+- **stderr**: error diagnostics. A `build` failure ends with `FAILED: no digests computed`; a `compare` input failure ends with `FAILED: the cells could not be compared`, and each comparison failure in the report is repeated there as `error: …`.
+
+---
+
+## `tools/evidence/record_structural.py`
+
+Writes CF-04 verification records for the structural check of a pack (issue #366, `docs/verification-records.md`). Runs the structural validation, then writes one record per fixture with the SHA-256 of the fixture file, the instant the check ran and `method: "structural"`. It writes nothing when a fixture does not validate, never derives an instant from a header comment, and never records a live observation.
+
+### Synopsis
+
+```bash
+python3 tools/evidence/record_structural.py PACK [--output-dir DIR]
+    [--verifier-version VERSION] [--dry-run]
+```
+
+### Options
+
 - `-h`, `--help`: show this help message and exit
 - `PACK`: the pack directory to check (required)
 - `--output-dir DIR`: where to write the records (default: `PACK/evidence/records`)
@@ -134,22 +160,14 @@ python3 tools/evidence/record_structural.py PACK [--output-dir DIR]
 
 | Exit Code | Meaning |
 |---|---|
-| `0` | Success: the digests were measured, or the cells agree on the uncompressed tar-stream digest. |
-| `1` | The digests differ between cells, a cell produced no digest, the cell count does not match the declared matrix, a result document is unreadable, or the archive could not be built. |
-| `2` | Command-line syntax error: missing `--results`, unknown options, or `--expected-matrix` that is not a JSON object. |
-
-### Output Streams
-
-- **stdout**: the result document (`build`) or the markdown table and report (`compare`); help text when `--help` is invoked.
-- **stderr**: error diagnostics; the comparison failures are repeated there as `error: …`.
 | `0` | Success: the pack validates and every record was written (or would be, with `--dry-run`). |
-| `1` | The records cannot be written: the pack does not validate, holds no fixture, or a record would not satisfy the CF-04 rules. Nothing is written. |
+| `1` | The records cannot be written: the pack is not found, does not validate, holds no fixture, or a record would not satisfy the CF-04 rules (nothing is written in these cases); or the output directory or a record file could not be written. |
 | `2` | Command-line syntax error: missing `PACK` or unknown options. |
 
 ### Output Streams
 
-- **stdout**: the number of records written and their paths; help text when `--help` is invoked.
-- **stderr**: error diagnostics; the validator's own findings when the pack does not validate.
+- **stdout**: `OK: wrote N record(s) at <instant>` followed by the path of each record, or `OK: the pack validates; no record written (dry run at <instant>)`; help text when `--help` is invoked.
+- **stderr**: `error: …` diagnostics, including the validator's own findings when the pack does not validate, followed by `FAILED: no record written`.
 
 ---
 

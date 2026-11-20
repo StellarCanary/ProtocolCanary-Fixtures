@@ -1,0 +1,47 @@
+# Protocol 28 / ScVal: an `SCV_CONTRACT_INSTANCE` storage pointer is an `SCMap`.
+#
+# What this tests:
+# the `SCV_CONTRACT_INSTANCE` arm carrying a Wasm executable and a present storage `SCMap` with one entry: the ContractExecutable, the SCMap* present flag, the entry count and the SCMapEntry key/value pair.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct SCContractInstance { ContractExecutable executable; SCMap* storage; };` -- Stellar-contract.x lines 246-249.
+#   * `typedef SCMapEntry SCMap<>;` -- line 243; `struct SCMapEntry { SCVal key; SCVal val; }` -- lines 318-322.
+#   * `union ContractExecutable` -- lines 198-204; `enum SCValType` -- lines 26-81; `union SCVal` -- lines 254-316.
+#
+# Why it matters:
+# The storage field is an optional SCMap pointer, not an optional ContractExecutable. The two layouts differ after the present flag: an SCMap starts with an entry count and then repeated ScVal pairs, so confusing them silently changes the value or the number of bytes consumed.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a
+# decoder must accept this value and re-encoding it must reproduce
+# value_base64 byte for byte, not merely an equal value. The payload was
+# produced by a program that builds the typed value with the official
+# `stellar-xdr 28.0.1` crate (features base64 and alloc -- the crate version
+# Protocol-Canary's canary-xdr pins for Protocol 28) and serialises it
+# with to_xdr_base64(Limits::none()), never hand-assembled. Generation
+# expression, recorded verbatim:
+#
+#   ScVal::ContractInstance(ScContractInstance { executable: ContractExecutable::Wasm(Hash([0xab; 32])), storage: Some(ScMap::try_from(vec![ScMapEntry { key: ScVal::Symbol(ScSymbol::try_from(b"a".to_vec()).unwrap()), val: ScVal::U32(7) }]).unwrap()) })
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (3acc79c0c 2026-11-05); generated 2026-11-20 (UTC). The same program asserted the crate's own round trip: from_xdr_base64 returned Ok and re-encoding the decoded value reproduced the encoding exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes, which are quoted
+# in full in the fixture.
+#
+# Every payload byte is a synthetic structural value, not a capture of a real network object: the fixed bytes are arbitrary sentinels chosen by the generator, no account key, contract id, signature or secret key is a real one, and nothing here was observed on a network.
+#
+# The XDR definition cited below is the pinned file, not a moving branch.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x
+
+id = "p28-xdr-scval-contract-instance-storage-map"
+protocol = 28
+surface = "xdr"
+category = "scval-composite"
+description = "A contract-instance ScVal with a present storage SCMap round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x"
+
+type = "ScVal"
+kind = "roundtrip"
+value_base64 = "AAAAEwAAAACrq6urq6urq6urq6urq6urq6urq6urq6urq6urq6urqwAAAAEAAAABAAAADwAAAAFhAAAAAAAAAwAAAAc="

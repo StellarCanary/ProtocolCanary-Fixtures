@@ -407,6 +407,12 @@ class BaselineHashTest(unittest.TestCase):
     content: a content change legitimately moves all four hashes, while the
     property being pinned stays the same -- the atomic write reproduces
     whatever bytes the tools produce.
+    ``upstream/main`` at ec10f95, before this branch changed any tool, and
+    re-recorded on 2026-11-20 when the Protocol 28 ScVal schema, null-map,
+    scalar-endpoint and wide-integer fixtures (issues #503-#506) changed the
+    pack's content: a content change legitimately moves all four hashes,
+    while the property being pinned stays the same -- the atomic write
+    reproduces whatever bytes the tools produce.
 
     Recompute them with:
         python3 tools/pack/pack.py protocol-28 --version 1.0.0 --output-dir D

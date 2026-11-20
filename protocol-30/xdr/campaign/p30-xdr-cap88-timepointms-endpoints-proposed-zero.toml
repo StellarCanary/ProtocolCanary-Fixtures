@@ -1,0 +1,57 @@
+# Protocol 30 structural StellarValue vector for CAP-88's
+# STELLAR_VALUE_EMPTY_TX_SET_MS arm (discriminant 4) at the unsigned
+# TimePointMs lower endpoint (zero: 0).
+#
+# The official stellar-xdr 30.0.0 Rust types encoded a typed StellarValue
+# with top-level tx_set_hash = Hash([0; 32]), close_time = 0,
+# close_time_ms = 0, no upgrades, and the EmptyTxSetMs arm.
+# Its arm fields are tx_set_hash = Hash([0x33; 32]),
+# previous_ledger_hash = Hash([0x44; 32]), and previous_ledger_version = 30.
+# CAP-88 requires close_time == floor(close_time_ms / 1000); at zero
+# close_time is exactly 0. The independent Python decoder test asserts
+# these fields and that relationship. This vector does not assert that its
+# synthetic hashes describe a real transaction set or ledger.
+#
+# Generation expression:
+#
+#   StellarValue {
+#       tx_set_hash: Hash([0; 32]),
+#       close_time: TimePoint(0),
+#       upgrades: VecM::default(),
+#       ext: StellarValueExt::EmptyTxSetMs(StellarValueProposedMs {
+#           close_time_ms: TimePointMs(0),
+#           tx_set_hash: Hash([0x33; 32]),
+#           previous_ledger_hash: Hash([0x44; 32]),
+#           previous_ledger_version: 30,
+#           lc_value_signature: LedgerCloseValueSignature {
+#               node_id: NodeId(PublicKey::PublicKeyTypeEd25519(
+#                   Uint256([0x66; 32]))),
+#               signature: Signature(vec![0x55; 64].try_into().unwrap()),
+#           },
+#       }),
+#   }
+#
+# Crate: stellar-xdr 30.0.0; rustc 1.99.1 (58cf8f9c3 2026-10-13);
+# generated 2026-11-20 (UTC).
+#
+# The node id and 64-byte signature are deterministic sentinels. They are not
+# cryptographically verified and do not represent a valid consensus vote.
+# This fixture proves XDR structure only, not consensus validity or complete
+# Protocol 30 compatibility.
+#
+# Authoritative definitions:
+# Pinned Stellar-ledger.x:
+# https://github.com/stellar/stellar-xdr/blob/4f524bbac80c781c06e4fb5fc93a2d0d331d6705/Stellar-ledger.x
+# Pinned cap-0088.md:
+# https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md
+
+id = "p30-xdr-cap88-timepointms-endpoints-proposed-zero"
+protocol = 30
+surface = "xdr"
+category = "cap-0088"
+description = "A StellarValue using CAP-88 STELLAR_VALUE_EMPTY_TX_SET_MS with zero closeTimeMs round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md"
+
+type = "StellarValue"
+kind = "roundtrip"
+value_base64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0REREREREREREREREREREREREREREREREREREREREREAAAAHgAAAABmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZgAAAEBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"

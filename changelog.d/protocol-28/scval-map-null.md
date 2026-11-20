@@ -1,0 +1,1 @@
+- Add a Protocol 28 pack fixture for an absent (null) `SCMap`, distinct from the existing present-but-empty map fixture.

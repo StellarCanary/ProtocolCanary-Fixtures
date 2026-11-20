@@ -1,0 +1,46 @@
+# Protocol 28 / ScVal: an `SCV_U128` low-limb carry boundary round-trips.
+#
+# What this tests:
+# `SCV_U128` carrying 2^64 as `UInt128Parts { hi: 1, lo: 0 }`: the carry from the low 64-bit limb into the high limb.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `case SCV_U128: UInt128Parts u128;` -- Stellar-contract.x lines 277-278; `struct UInt128Parts { uint64 hi; uint64 lo; };` -- lines 156-159.
+#   * `enum SCValType` -- Stellar-contract.x lines 26-81; `union SCVal` -- lines 254-316.
+#
+# Why it matters:
+# Zero and all-ones do not distinguish limb order. 2^64 has a non-zero high limb and a zero low limb, so a decoder that swapped hi and lo, or read only one limb, produces a different value.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a
+# decoder must accept this value and re-encoding it must reproduce
+# value_base64 byte for byte, not merely an equal value. The payload was
+# produced by a program that builds the typed value with the official
+# `stellar-xdr 28.0.1` crate (features base64 and alloc -- the crate version
+# Protocol-Canary's canary-xdr pins for Protocol 28) and serialises it
+# with to_xdr_base64(Limits::none()), never hand-assembled. Generation
+# expression, recorded verbatim:
+#
+#   ScVal::U128(UInt128Parts { hi: 1, lo: 0 })
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (3acc79c0c 2026-11-05); generated 2026-11-20 (UTC). The same program asserted the crate's own round trip: from_xdr_base64 returned Ok and re-encoding the decoded value reproduced the encoding exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes, which are quoted
+# in full in the fixture.
+#
+# Every payload byte is a synthetic structural value, not a capture of a real network object: the fixed bytes are arbitrary sentinels chosen by the generator, no account key, contract id, signature or secret key is a real one, and nothing here was observed on a network.
+#
+# The XDR definition cited below is the pinned file, not a moving branch.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x
+
+id = "p28-xdr-scval-u128-u64-boundary"
+protocol = 28
+surface = "xdr"
+category = "scval"
+description = "`ScVal::U128(2^64)` round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x"
+
+type = "ScVal"
+kind = "roundtrip"
+value_base64 = "AAAACQAAAAAAAAABAAAAAAAAAAA="

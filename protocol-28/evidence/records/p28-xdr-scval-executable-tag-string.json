@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-scval-executable-tag-string",
+  "fixtureSha256": "9a6fbbce659a283082871b50f3661dd48908fb5e174ea05f0a4575b3e897e6ce",
+  "method": "structural",
+  "checkedAt": "2026-11-20T11:21:00Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

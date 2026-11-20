@@ -122,7 +122,7 @@ separate Testnet/Futurenet workflow is described in
 |---|---|---|
 | [`protocol-30/`](protocol-30/) | Testnet candidate | One live RPC identity fixture; not full Protocol 30 support. See [verification](docs/protocol-30-live-verification.md). |
 | [`protocol-29/`](protocol-29/) | Published | One RPC version-info fixture, still applicable to Futurenet. Historical Testnet records are preserved. |
-| [`protocol-28/`](protocol-28/) | Active | CAP-0083, CAP-0085 (XDR); Protocol 28 RPC identity; a Soroban simulation smoke fixture. Fixture counts by surface: **4 xdr, 1 rpc, 1 soroban** (6 total). See [`docs/protocol-28.md`](docs/protocol-28.md). |
+| [`protocol-28/`](protocol-28/) | Active | CAP-0083, CAP-0085 (XDR); Protocol 28 RPC identity; a Soroban simulation smoke fixture. The fixture set grows with each contribution, so this table does not repeat fixture counts: see [`protocol-28/README.md`](protocol-28/README.md) and [`docs/protocol-28.md`](docs/protocol-28.md). The complete inventory is the generated canonical registry, which is not committed in a source checkout; print it with `python3 tools/registry/generate.py protocol-28 --stdout`. |
 | [`protocol-27/`](protocol-27/) | Not yet populated | **0 fixtures.** See [`protocol-27/README.md`](protocol-27/README.md) — fixtures are added only after their upstream behavior is independently verified, never as placeholders. |
 
 Pack directories are named **`protocol-<N>`**, where `<N>` is the Stellar

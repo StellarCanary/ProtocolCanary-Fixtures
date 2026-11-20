@@ -1,0 +1,52 @@
+# Protocol 30 structural StellarValue vector for CAP-88's
+# STELLAR_VALUE_SIGNED_MS arm (discriminant 3) at the unsigned
+# TimePointMs upper endpoint (maximum uint64: 18446744073709551615).
+#
+# The official stellar-xdr 30.0.0 Rust types encoded a typed StellarValue
+# with tx_set_hash = Hash([0x11; 32]), close_time = 18_446_744_073_709_551,
+# close_time_ms = 18_446_744_073_709_551_615, no upgrades, and the SignedMs arm.
+# CAP-88 requires close_time == floor(close_time_ms / 1000); at u64::MAX
+# close_time is exactly 18446744073709551. The independent Python decoder
+# test asserts both values and this relationship. It also checks the
+# signature fields and re-encodes the bytes separately from the Rust source.
+#
+# Generation expression:
+#
+#   StellarValue {
+#       tx_set_hash: Hash([0x11; 32]),
+#       close_time: TimePoint(18446744073709551),
+#       upgrades: VecM::default(),
+#       ext: StellarValueExt::SignedMs(StellarValueSignedMs {
+#           close_time_ms: TimePointMs(18446744073709551615),
+#           lc_value_signature: LedgerCloseValueSignature {
+#               node_id: NodeId(PublicKey::PublicKeyTypeEd25519(
+#                   Uint256([0x66; 32]))),
+#               signature: Signature(vec![0x55; 64].try_into().unwrap()),
+#           },
+#       }),
+#   }
+#
+# Crate: stellar-xdr 30.0.0; rustc 1.99.1 (58cf8f9c3 2026-10-13);
+# generated 2026-11-20 (UTC).
+#
+# The node id and 64-byte signature are deterministic sentinels. They are not
+# cryptographically verified and do not represent a valid consensus vote.
+# This fixture proves XDR structure only, not consensus validity or complete
+# Protocol 30 compatibility.
+#
+# Authoritative definitions:
+# Pinned Stellar-ledger.x:
+# https://github.com/stellar/stellar-xdr/blob/4f524bbac80c781c06e4fb5fc93a2d0d331d6705/Stellar-ledger.x
+# Pinned cap-0088.md:
+# https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md
+
+id = "p30-xdr-cap88-timepointms-endpoints-signed-maximum"
+protocol = 30
+surface = "xdr"
+category = "cap-0088"
+description = "A StellarValue using CAP-88 STELLAR_VALUE_SIGNED_MS with maximum uint64 closeTimeMs round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md"
+
+type = "StellarValue"
+kind = "roundtrip"
+value_base64 = "EREREREREREREREREREREREREREREREREREREREREREAQYk3S8an7wAAAAAAAAAD//////////8AAAAAZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmYAAABAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQ=="

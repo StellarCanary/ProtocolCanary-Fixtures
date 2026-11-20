@@ -1,0 +1,1 @@
+- Add ScVal wide-integer limb-boundary fixtures: 2^64 for u128 and u256, and -1 with all-ones sign extension for i128 and i256.

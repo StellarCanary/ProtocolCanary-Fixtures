@@ -1,5 +1,5 @@
 {
-  "description": "Golden ScVal XDR test vectors for protocol 28. Each entry pairs a logical ScVal with the exact bytes its XDR encoding must produce. The xdr_hex values were derived by writing the byte layout out field by field from the authoritative definition in stellar/stellar-xdr at tag v28.0 (commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694), file Stellar-contract.x -- enum SCValType, union SCVal, SCVec/SCMap/SCMapEntry, SCAddress and the {U,I}{128,256}Parts structs -- not by running the codec under test.",
+  "description": "Golden ScVal XDR test vectors for protocol 28. Each entry pairs a logical ScVal with the exact bytes its XDR encoding must produce. The xdr_hex values were derived by writing the byte layout out field by field from the authoritative definition in stellar/stellar-xdr at tag v28.0 (commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694), file Stellar-contract.x -- enum SCValType, union SCVal, SCVec/SCMap/SCMapEntry, SCAddress, SCError, SCContractInstance, SCNonceKey, ContractExecutable and the {U,I}{128,256}Parts structs -- not by running the codec under test. Vectors for SCError, SCNonceKey, SCContractInstance.storage and SCV_EXECUTABLE_TAG were corrected against that schema and regenerated with the official stellar-xdr 28.0.1 crate.",
   "source_reference": "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x",
   "xdr_tag": "v28.0",
   "vectors": [
@@ -212,10 +212,10 @@
     },
     {
       "name": "string_utf8_multibyte",
-      "note": "'h\u00e9llo' is 6 UTF-8 bytes -> 2 zero pad bytes",
+      "note": "'héllo' is 6 UTF-8 bytes -> 2 zero pad bytes",
       "scval": {
         "type": "string",
-        "value": "h\u00e9llo"
+        "value": "héllo"
       },
       "xdr_hex": "0000000e0000000668c3a96c6c6f0000"
     },
@@ -385,39 +385,44 @@
       "xdr_hex": "00000012000000015555555555555555555555555555555555555555555555555555555555555555"
     },
     {
-      "name": "error_ok",
-      "note": "SCV_ERROR discriminant 2, SCE_OK discriminant 0 carries no payload",
+      "name": "address_muxed_account",
+      "note": "SC_ADDRESS_TYPE_MUXED_ACCOUNT (2) wraps MuxedEd25519Account { uint64 id; uint256 ed25519; }",
       "scval": {
-        "type": "error",
+        "type": "address",
         "value": {
-          "type": "ok"
+          "type": "muxed-account",
+          "id": 72623859790382856,
+          "ed25519": "3333333333333333333333333333333333333333333333333333333333333333"
         }
       },
-      "xdr_hex": "0000000200000000"
+      "xdr_hex": "000000120000000201020304050607083333333333333333333333333333333333333333333333333333333333333333"
     },
     {
-      "name": "error_type_with_code",
-      "note": "SCV_ERROR discriminant 2, SCE_TYPE discriminant 1 with u32 code",
+      "name": "address_claimable_balance",
+      "note": "SC_ADDRESS_TYPE_CLAIMABLE_BALANCE (3) wraps ClaimableBalanceID: ClaimableBalanceIDType V0 (0) then a 32-byte Hash",
       "scval": {
-        "type": "error",
+        "type": "address",
         "value": {
-          "type": "type",
-          "code": 42
+          "type": "claimable-balance",
+          "balance_id": {
+            "type": "v0",
+            "hash": "4444444444444444444444444444444444444444444444444444444444444444"
+          }
         }
       },
-      "xdr_hex": "00000002000000010000002a"
+      "xdr_hex": "0000001200000003000000004444444444444444444444444444444444444444444444444444444444444444"
     },
     {
-      "name": "error_contract_with_code",
-      "note": "SCV_ERROR discriminant 2, SCE_CONTRACT discriminant 6 with u32 code",
+      "name": "address_liquidity_pool",
+      "note": "SC_ADDRESS_TYPE_LIQUIDITY_POOL (4) wraps PoolID = Hash, a fixed 32 bytes with no length prefix",
       "scval": {
-        "type": "error",
+        "type": "address",
         "value": {
-          "type": "contract",
-          "code": 100
+          "type": "liquidity-pool",
+          "pool_id": "5555555555555555555555555555555555555555555555555555555555555555"
         }
       },
-      "xdr_hex": "000000020000000600000064"
+      "xdr_hex": "00000012000000045555555555555555555555555555555555555555555555555555555555555555"
     },
     {
       "name": "ledger_key_contract_instance",
@@ -427,36 +432,6 @@
         "value": null
       },
       "xdr_hex": "00000014"
-    },
-    {
-      "name": "ledger_key_nonce_contract",
-      "note": "SCV_LEDGER_KEY_NONCE discriminant 21 with contract address and u64 nonce",
-      "scval": {
-        "type": "ledger-key-nonce",
-        "value": {
-          "address": {
-            "type": "contract",
-            "contract_id": "5555555555555555555555555555555555555555555555555555555555555555"
-          },
-          "nonce": 42
-        }
-      },
-      "xdr_hex": "00000015000000015555555555555555555555555555555555555555555555555555555555555555000000000000002a"
-    },
-    {
-      "name": "ledger_key_nonce_account_zero",
-      "note": "SCV_LEDGER_KEY_NONCE discriminant 21 with account address and zero nonce",
-      "scval": {
-        "type": "ledger-key-nonce",
-        "value": {
-          "address": {
-            "type": "account",
-            "ed25519": "1111111111111111111111111111111111111111111111111111111111111111"
-          },
-          "nonce": 0
-        }
-      },
-      "xdr_hex": "00000015000000000000000011111111111111111111111111111111111111111111111111111111111111110000000000000000"
     },
     {
       "name": "contract_instance_wasm_no_storage",
@@ -474,64 +449,85 @@
       "xdr_hex": "0000001300000000abababababababababababababababababababababababababababababababab00000000"
     },
     {
-      "name": "contract_instance_stellar_asset_with_external_ref_storage",
-      "note": "SCV_CONTRACT_INSTANCE discriminant 19 with StellarAsset executable and ExternalRef storage",
+      "name": "error_contract_with_code",
+      "note": "SCV_ERROR discriminant 2, SCE_CONTRACT discriminant 0 with a user-defined uint32 contractCode",
+      "scval": {
+        "type": "error",
+        "value": {
+          "type": "contract",
+          "code": 100
+        }
+      },
+      "xdr_hex": "000000020000000000000064"
+    },
+    {
+      "name": "error_wasm_vm_with_code",
+      "note": "SCV_ERROR discriminant 2, SCE_WASM_VM discriminant 1 with SCErrorCode InvalidInput (2)",
+      "scval": {
+        "type": "error",
+        "value": {
+          "type": "wasm-vm",
+          "code": 2
+        }
+      },
+      "xdr_hex": "000000020000000100000002"
+    },
+    {
+      "name": "ledger_key_nonce_negative_one",
+      "note": "SCV_LEDGER_KEY_NONCE discriminant 21 carries SCNonceKey { int64 nonce; } = -1, all 64 bits set",
+      "scval": {
+        "type": "ledger-key-nonce",
+        "value": {
+          "nonce": -1
+        }
+      },
+      "xdr_hex": "00000015ffffffffffffffff"
+    },
+    {
+      "name": "ledger_key_nonce_max",
+      "note": "SCV_LEDGER_KEY_NONCE discriminant 21 carries SCNonceKey { int64 nonce; } = i64::MAX",
+      "scval": {
+        "type": "ledger-key-nonce",
+        "value": {
+          "nonce": 9223372036854775807
+        }
+      },
+      "xdr_hex": "000000157fffffffffffffff"
+    },
+    {
+      "name": "contract_instance_wasm_with_storage_map",
+      "note": "SCV_CONTRACT_INSTANCE discriminant 19, Wasm executable, then the SCMap* present flag (1), entry count 1 and one SCMapEntry",
       "scval": {
         "type": "contract-instance",
         "value": {
           "executable": {
-            "type": "stellar-asset"
+            "type": "wasm",
+            "wasm_hash": "abababababababababababababababababababababababababababababababab"
           },
-          "storage": {
-            "type": "external-ref",
-            "owner": {
-              "type": "contract",
-              "contract_id": "5555555555555555555555555555555555555555555555555555555555555555"
-            },
-            "tag": "fleet-v1"
-          }
+          "storage": [
+            {
+              "key": {
+                "type": "symbol",
+                "value": "a"
+              },
+              "val": {
+                "type": "u32",
+                "value": 7
+              }
+            }
+          ]
         }
       },
-      "xdr_hex": "0000001300000001000000010000000200000001555555555555555555555555555555555555555555555555555555555555555500000008666c6565742d7631"
+      "xdr_hex": "0000001300000000abababababababababababababababababababababababababababababababab00000001000000010000000f00000001610000000000000300000007"
     },
     {
-      "name": "executable_tag_wasm",
-      "note": "SCV_EXECUTABLE_TAG discriminant 22, CONTRACT_EXECUTABLE_WASM (0) with 32-byte hash",
+      "name": "executable_tag_string",
+      "note": "SCV_EXECUTABLE_TAG discriminant 22 carries SCString: a 4-byte length and UTF-8 bytes, here 'fleet-v1'",
       "scval": {
         "type": "executable-tag",
-        "value": {
-          "type": "wasm",
-          "wasm_hash": "abababababababababababababababababababababababababababababababab"
-        }
+        "value": "fleet-v1"
       },
-      "xdr_hex": "0000001600000000abababababababababababababababababababababababababababababababab"
-    },
-    {
-      "name": "executable_tag_stellar_asset",
-      "note": "SCV_EXECUTABLE_TAG discriminant 22, CONTRACT_EXECUTABLE_STELLAR_ASSET (1) void arm",
-      "scval": {
-        "type": "executable-tag",
-        "value": {
-          "type": "stellar-asset"
-        }
-      },
-      "xdr_hex": "0000001600000001"
-    },
-    {
-      "name": "executable_tag_external_ref",
-      "note": "SCV_EXECUTABLE_TAG discriminant 22, CONTRACT_EXECUTABLE_EXTERNAL_REF (2) with owner and tag",
-      "scval": {
-        "type": "executable-tag",
-        "value": {
-          "type": "external-ref",
-          "owner": {
-            "type": "contract",
-            "contract_id": "5555555555555555555555555555555555555555555555555555555555555555"
-          },
-          "tag": "fleet-v1"
-        }
-      },
-      "xdr_hex": "000000160000000200000001555555555555555555555555555555555555555555555555555555555555555500000008666c6565742d7631"
+      "xdr_hex": "0000001600000008666c6565742d7631"
     }
   ]
 }

@@ -1,0 +1,1 @@
+- Add the missing 32-bit and 64-bit ScVal endpoints for i32, i64, u32 and u64, plus zero and maximum timepoint and duration fixtures that test XDR integer representation only.

@@ -373,10 +373,11 @@ class ScValNegativeTests(unittest.TestCase):
                         scval_xdr.decode(raw)
 
     def test_unsupported_address_type_is_rejected(self) -> None:
-        # v28.0 defines muxed-account, claimable-balance and liquidity-pool
-        # addresses; this codec covers only account and contract, so the
-        # others must be refused rather than decoded as one of those.
-        for address_type in (2, 3, 4, 99):
+        # v28.0 defines account (0), contract (1), muxed-account (2),
+        # claimable-balance (3) and liquidity-pool (4). The codec supports
+        # those plus CAP-84's muxed-contract (5); anything else must be refused
+        # rather than decoded as a known arm.
+        for address_type in (6, 99, 0xFFFFFFFF):
             with self.subTest(address_type=address_type):
                 payload = (
                     scval_xdr.SCV_ADDRESS.to_bytes(4, "big")

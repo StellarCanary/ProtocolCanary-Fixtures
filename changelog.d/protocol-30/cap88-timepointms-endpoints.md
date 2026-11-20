@@ -1,0 +1,1 @@
+- Add offline Protocol 30 fixtures covering CAP-88 TimePointMs unsigned encoding endpoints (zero and maximum uint64) for signed and proposed StellarValue arms.

@@ -1,0 +1,90 @@
+# Protocol 30 live read-only verification against Stellar Testnet only
+# (issue #498). It runs the existing bounded capture tool for the protocol-30
+# pack and requires every Protocol 30 RPC fixture check to execute and match;
+# zero checks, a skipped check, a mismatch or a capture failure fail the job.
+# Raw captures, records and the command log are uploaded as run artifacts even
+# when capture fails. Nothing is committed: the job has read-only contents
+# permission, uses no secrets and never pushes.
+#
+# Futurenet and Mainnet are out of scope here: Protocol 29's Futurenet check
+# stays in protocol29-live-evidence.yml.
+
+name: protocol30-live-evidence
+
+on:
+  schedule:
+    # Separate weekly slot from the Protocol 28 and Protocol 29 capture
+    # workflows.
+    - cron: "7 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    # Bounded so a stuck call cannot hold a runner for the 360-minute default;
+    # each RPC call is also bounded by the capture tool's --timeout.
+    timeout-minutes: 15
+    env:
+      # The only endpoint this workflow calls: https://soroban-testnet.stellar.org
+      ENDPOINT: soroban-testnet.stellar.org
+      LIVE_DIR: protocol-30/evidence/live/testnet
+    steps:
+      - name: Check out the fixture pack
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.11.16"
+
+      - name: Capture and execute Protocol 30 Testnet fixtures
+        id: capture
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          # Start from an empty output directory in the runner workspace so the
+          # artifact holds only this run's captures and records, never the
+          # evidence already committed in the checkout.
+          rm -rf "$LIVE_DIR"
+          mkdir -p "$LIVE_DIR/run"
+          set +e
+          python3 tools/evidence/capture_live.py protocol-30 \
+            --endpoint "$ENDPOINT" \
+            --output-dir "$LIVE_DIR" \
+            --timeout 30 \
+            --require-matched > "$LIVE_DIR/run/capture.log" 2>&1
+          status=$?
+          printf '%s\n' "$status" > "$LIVE_DIR/run/exit-code.txt"
+          cat "$LIVE_DIR/run/capture.log"
+          exit "$status"
+
+      - name: Validate the generated Protocol 30 records
+        id: validate
+        if: steps.capture.outcome == 'success'
+        run: |
+          set -o pipefail
+          python3 tools/validate/validate.py protocol-30 \
+            --evidence "$LIVE_DIR/records" 2>&1 | tee "$LIVE_DIR/run/validate.log"
+
+      - name: Upload captures, records and command logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: protocol-30-live-evidence-testnet-${{ github.run_number }}
+          path: protocol-30/evidence/live/testnet
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Require executed, passing checks
+        if: always()
+        env:
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+        run: |
+          if [[ "$CAPTURE_OUTCOME" != "success" ]]; then
+            echo "Protocol 30 Testnet capture did not execute and match every fixture check."
+            exit 1
+          fi
