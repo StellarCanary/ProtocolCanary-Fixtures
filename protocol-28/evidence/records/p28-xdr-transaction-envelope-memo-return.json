@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-envelope-memo-return",
+  "fixtureSha256": "ab641ca3c7f7d19b38b751e7ed57d0fe0c8fa7d3dc3bb78e86e6f6dd7874364a",
+  "method": "structural",
+  "checkedAt": "2026-11-20T11:51:26Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

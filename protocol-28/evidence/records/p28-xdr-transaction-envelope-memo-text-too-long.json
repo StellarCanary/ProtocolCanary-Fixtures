@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-envelope-memo-text-too-long",
+  "fixtureSha256": "9b46192fa9123b4e0e682576d72bd51adb0e98240e9d5a0e0b25f5d2491eefdc",
+  "method": "structural",
+  "checkedAt": "2026-11-20T11:51:26Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

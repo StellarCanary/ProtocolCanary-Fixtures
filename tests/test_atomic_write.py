@@ -401,6 +401,12 @@ class BaselineHashTest(unittest.TestCase):
 
     The values were recorded by building the same four artifacts from
     ``upstream/main`` at ec10f95, before this branch changed any tool, and
+    re-recorded on 2026-10-26 when the three protocol-28 boundary fixtures
+    (issue #340) changed the pack's content, and again on 2026-11-20 when the
+    TransactionEnvelope upload, memo, time-bound and issued-asset fixtures
+    changed it: a content change legitimately moves all four hashes, while the
+    property being pinned stays the same -- the atomic write reproduces
+    whatever bytes the tools produce.
     re-recorded on 2026-11-20 when the Protocol 28 ScVal schema, null-map,
     scalar-endpoint and wide-integer fixtures (issues #503-#506) changed the
     pack's content: a content change legitimately moves all four hashes,
@@ -418,13 +424,13 @@ class BaselineHashTest(unittest.TestCase):
 
     BASELINE = {
         "protocolcanary-fixtures-1.0.0.tar.gz":
-            "4ba0cd506a3e26601759dbc3885a88e5721a96367974bc0b1838ade0c3b43f89",
+            "8355c0b687189931e526ae7443fbc93b705565fa36a0027e778c800b6d80af3d",
         "protocolcanary-fixtures-1.0.0.manifest.json":
-            "54348170d10e8b0a8fcd9c2b18dba113a546983dfbfd60c6b6a6fb67285ca0bc",
+            "ea56db32f4dcdf53f4c1a9c66a6d828c0c69a48876d3f7cc9690de4d98214a6d",
         "protocolcanary-fixtures-1.0.0.tar.gz.sha256":
-            "33801c3864d694389307619e833ec4a7521d883be065634d3433114454e8ded5",
+            "ecc01471923487540a472ae699ab8210b8e6f166281c4dd49f709074270672bf",
         "registry-v1.json":
-            "cecd3fc528955f214e988c11f4e6fac13a7e4462168c13e195b43ea0815e13e8",
+            "3422dffdbf14b3df9e04258db51a417e32504da5f7ce1f3eca51aa331678dc47",
     }
 
     def setUp(self) -> None:

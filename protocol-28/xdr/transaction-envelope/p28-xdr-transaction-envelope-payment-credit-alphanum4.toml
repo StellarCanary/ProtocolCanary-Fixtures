@@ -1,0 +1,88 @@
+# Protocol 28 / TransactionEnvelope: a Payment with an AlphaNum4 issued asset round-trips.
+#
+# The pack's Payment fixtures use only the native Asset arm. The
+# independent codec already supports both issued-asset arms, and
+# `ASSET_TYPE_CREDIT_ALPHANUM4` is the fixed four-byte code plus a
+# 32-byte issuer key. This fixture adds a Payment that pays a synthetic
+# AlphaNum4 asset, exercising the code and issuer fields.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010;
+#   * `struct TransactionV1Envelope` — Stellar-transaction.x lines 967-973;
+#   * `struct Transaction` — Stellar-transaction.x lines 932-965;
+#   * `struct Operation` and `struct PaymentOp` — Stellar-transaction.x
+#     lines 653-719 and 92-97;
+#   * `union Asset`, `enum AssetType`, `typedef opaque AssetCode4[4]`,
+#     `struct AlphaNum4` — Stellar-ledger-entries.x lines 19-30, 55-66
+#     and Stellar-transaction.x lines 80-86;
+#   * `union PublicKey` and `enum PublicKeyType` — Stellar-types.x lines
+#     29-57;
+#   * `struct DecoratedSignature` — Stellar-transaction.x lines 33-37.
+#
+# Why it matters: an issued asset changes the Payment body's size and adds
+# a fixed-width code and an issuer union that a native-asset-only decoder
+# never reads. A decoder that stopped after the asset type, or that read the
+# code as a variable-length string, would misread the amount and the rest of
+# the envelope. This fixture proves the arm round-trips: decoding and
+# re-encoding must reproduce exactly these bytes.
+#
+# The payload was produced by a program that builds the typed value with
+# the official `stellar-xdr` 28.0.1 crate (features base64 and alloc, the
+# crate version Protocol-Canary's canary-xdr pins for Protocol 28; rustc
+# 1.100.0 (0ef1bc386 2026-11-09)) and serialises it, never hand-assembled.
+# Generation expression, recorded verbatim:
+#
+#   TransactionEnvelope::Tx(TransactionV1Envelope {
+#       tx: Transaction {
+#           source_account: MuxedAccount::Ed25519(Uint256([0x74; 32])),
+#           fee: 100_000,
+#           seq_num: SequenceNumber(6_100_006),
+#           cond: Preconditions::None,
+#           memo: Memo::None,
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::Payment(PaymentOp {
+#                   destination: MuxedAccount::Ed25519(Uint256([0x75; 32])),
+#                   asset: Asset::CreditAlphanum4(AlphaNum4 {
+#                       asset_code: AssetCode4(*b"USD1"),
+#                       issuer: AccountId(PublicKey::PublicKeyTypeEd25519(
+#                           Uint256([0x76; 32]),
+#                       )),
+#                   }),
+#                   amount: 4_005,
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionExt::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x77; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x77; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   }).to_xdr_base64(Limits::none())
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (0ef1bc386 2026-11-09);
+# generated 2026-11-20 (UTC). The same crate round-tripped the value:
+# TransactionEnvelope::from_xdr_base64 followed by to_xdr reproduced the
+# 240-byte encoding exactly, byte for byte.
+#
+# Every payload byte is a synthetic structural value, not a capture of a
+# real network object: the 0x74-filled source account, 0x75-filled
+# destination and 0x76-filled issuer are not real accounts, the 0x77-filled
+# signature hint and signature are not a signature made by any key, and the
+# fee, sequence number, asset code and amount are arbitrary fixed values.
+# The asset is not issued, funded or present on any network. The signature
+# does not sign anything and was never observed on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-transaction-envelope-payment-credit-alphanum4"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A Payment `TransactionEnvelope` with an `AlphaNum4` issued asset round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAAB0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dAABhqAAAAAAAF0UJgAAAAAAAAAAAAAAAQAAAAAAAAABAAAAAHV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1dXV1AAAAAVVTRDEAAAAAdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnYAAAAAAAAPpQAAAAAAAAABd3d3dwAAAEB3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"

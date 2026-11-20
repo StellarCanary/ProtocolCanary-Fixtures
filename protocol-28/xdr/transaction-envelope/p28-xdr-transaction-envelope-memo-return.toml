@@ -1,0 +1,80 @@
+# Protocol 28 / TransactionEnvelope: a 32-byte MEMO_RETURN round-trips.
+#
+# `TransactionEnvelope` carries a `Memo` union. Its `MEMO_RETURN` arm is a
+# fixed 32-byte `Hash`, distinct from `MEMO_HASH` only by its
+# discriminant, and the pack's existing envelopes all use MEMO_NONE. This
+# fixture exercises the return arm so that a decoder that maps both hash
+# arms onto one discriminant, or that skips the fixed payload, cannot
+# silently accept a different shape.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010;
+#   * `struct TransactionV1Envelope` — Stellar-transaction.x lines 967-973;
+#   * `struct Transaction` — Stellar-transaction.x lines 932-965;
+#   * `union Memo` and `enum MemoType` — Stellar-transaction.x lines
+#     754-771;
+#   * `typedef opaque Hash[32]` — Stellar-types.x line 10;
+#   * `struct Operation` and `struct PaymentOp` — Stellar-transaction.x
+#     lines 653-719 and 92-97;
+#   * `struct DecoratedSignature` — Stellar-transaction.x lines 33-37.
+#
+# Why it matters: MEMO_RETURN is discriminant 4, while MEMO_HASH is 3.
+# A decoder that collapsed the two arms would lose the distinction the
+# protocol defines. This fixture proves the return arm round-trips:
+# decoding and re-encoding must reproduce exactly these bytes.
+#
+# The payload was produced by a program that builds the typed value with
+# the official `stellar-xdr` 28.0.1 crate (features base64 and alloc, the
+# crate version Protocol-Canary's canary-xdr pins for Protocol 28; rustc
+# 1.100.0 (0ef1bc386 2026-11-09)) and serialises it, never hand-assembled.
+# Generation expression, recorded verbatim:
+#
+#   TransactionEnvelope::Tx(TransactionV1Envelope {
+#       tx: Transaction {
+#           source_account: MuxedAccount::Ed25519(Uint256([0x6b; 32])),
+#           fee: 100_000,
+#           seq_num: SequenceNumber(6_100_004),
+#           cond: Preconditions::None,
+#           memo: Memo::Return(Hash([0x6c; 32])),
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::Payment(PaymentOp {
+#                   destination: MuxedAccount::Ed25519(Uint256([0x6d; 32])),
+#                   asset: Asset::Native,
+#                   amount: 4_003,
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionExt::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x6e; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x6e; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   }).to_xdr_base64(Limits::none())
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (0ef1bc386 2026-11-09);
+# generated 2026-11-20 (UTC). The same crate round-tripped the value:
+# TransactionEnvelope::from_xdr_base64 followed by to_xdr reproduced the
+# 232-byte encoding exactly, byte for byte.
+#
+# Every payload byte is a synthetic structural value, not a capture of a
+# real network object: the 0x6b-filled source account and 0x6d-filled
+# destination are not real accounts, the 0x6c-filled memo hash is not a
+# hash of any transaction, the 0x6e-filled signature hint and signature
+# are not a signature made by any key, and the fee, sequence number and
+# amount are arbitrary fixed values. The signature does not sign anything
+# and was never observed on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-transaction-envelope-memo-return"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A `TransactionEnvelope` with a 32-byte `MEMO_RETURN` round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAABra2tra2tra2tra2tra2tra2tra2tra2tra2tra2trawABhqAAAAAAAF0UJAAAAAAAAAAEbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGwAAAABAAAAAAAAAAEAAAAAbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW0AAAAAAAAAAAAAD6MAAAAAAAAAAW5ubm4AAABAbm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubg=="

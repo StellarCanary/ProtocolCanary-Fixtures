@@ -1,0 +1,1 @@
+- Add Protocol 28 Payment `TransactionEnvelope` fixtures for the `AlphaNum4` and `AlphaNum12` issued-asset arms.

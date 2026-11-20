@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-envelope-time-bounds",
+  "fixtureSha256": "63375b27684ae7fdcf3c62c8394e1ff4cce5489e6f40528cd7df86da7a50634f",
+  "method": "structural",
+  "checkedAt": "2026-11-20T11:51:26Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

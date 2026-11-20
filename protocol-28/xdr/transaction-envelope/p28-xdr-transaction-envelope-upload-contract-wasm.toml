@@ -1,0 +1,108 @@
+# Protocol 28 / TransactionEnvelope: the UPLOAD_CONTRACT_WASM host function arm round-trips.
+#
+# `TransactionEnvelope` is the union every transaction reaches a network
+# in: the engine decodes it (canary-xdr's XdrTypeName::TransactionEnvelope)
+# and a signer signs it. The pack already covers the v0, v1, fee-bump and
+# INVOKE_CONTRACT shapes, but it had no fixture for the already-supported
+# HOST_FUNCTION_TYPE_UPLOAD_CONTRACT_WASM arm of HostFunction. This fixture
+# adds that arm with a synthetic Wasm payload.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010;
+#   * `struct TransactionV1Envelope` — Stellar-transaction.x lines 967-973;
+#   * `struct Transaction` — Stellar-transaction.x lines 932-965;
+#   * `struct InvokeHostFunctionOp` — Stellar-transaction.x lines 618-629;
+#   * `union HostFunction` — Stellar-transaction.x lines 521-531;
+#   * `enum HostFunctionType` (UPLOAD_CONTRACT_WASM = 2) —
+#     Stellar-transaction.x lines 475-481;
+#   * `struct Operation` — Stellar-transaction.x lines 653-719;
+#   * `enum OperationType` (INVOKE_HOST_FUNCTION = 24) —
+#     Stellar-transaction.x lines 39-73;
+#   * `struct SorobanTransactionData` — Stellar-transaction.x lines 879-900;
+#   * `struct DecoratedSignature` — Stellar-transaction.x lines 33-37.
+#
+# Why it matters: the Wasm payload is a variable-length opaque field inside
+# a host function. A decoder that stops at the operation body discriminant,
+# or that mistakes the payload's length prefix for a different field, would
+# read an upload transaction wrongly while still decoding an INVOKE_CONTRACT
+# transaction correctly. This fixture proves the arm round-trips: decoding
+# the value and re-encoding it must reproduce exactly these bytes, including
+# the opaque Wasm payload byte for byte.
+#
+# The payload was produced by a program that builds the typed value with
+# the official `stellar-xdr` 28.0.1 crate (features base64 and alloc, the
+# crate version Protocol-Canary's canary-xdr pins for Protocol 28; rustc
+# 1.100.0 (0ef1bc386 2026-11-09)) and serialises it, never hand-assembled.
+# Generation expression, recorded verbatim (the crate's ReadXdr/WriteXdr
+# impls provide to_xdr_base64/from_xdr_base64 over Limits::none()):
+#
+#   TransactionEnvelope::Tx(TransactionV1Envelope {
+#       tx: Transaction {
+#           source_account: MuxedAccount::Ed25519(Uint256([0x91; 32])),
+#           fee: 300_000,
+#           seq_num: SequenceNumber(5_678_901),
+#           cond: Preconditions::None,
+#           memo: Memo::None,
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::InvokeHostFunction(InvokeHostFunctionOp {
+#                   host_function: HostFunction::UploadContractWasm(
+#                       BytesM::try_from(vec![
+#                           0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00,
+#                       ]).unwrap(),
+#                   ),
+#                   auth: VecM::default(),
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionExt::V1(SorobanTransactionData {
+#               ext: SorobanTransactionDataExt::V0,
+#               resources: SorobanResources {
+#                   footprint: LedgerFootprint {
+#                       read_only: VecM::default(),
+#                       read_write: VecM::default(),
+#                   },
+#                   instructions: 1_000,
+#                   disk_read_bytes: 100,
+#                   write_bytes: 100,
+#               },
+#               resource_fee: 1_000,
+#           }),
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x92; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x92; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   }).to_xdr_base64(Limits::none())
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.100.0 (0ef1bc386 2026-11-09);
+# generated 2026-11-20 (UTC). The same crate round-tripped the value:
+# TransactionEnvelope::from_xdr_base64 followed by to_xdr reproduced the
+# 204-byte encoding exactly, byte for byte.
+#
+# The Wasm payload is the eight-byte minimal valid module (the `\0asm`
+# magic and version 1); it is test-only data, not a deployed contract. No
+# claim is made that a transaction containing it would be submitted, that
+# the host would accept it, that it would execute, or that anything was
+# deployed. Every other byte is a synthetic structural value: the
+# 0x91-filled source account is not a real account, the 0x92-filled
+# signature hint and signature are not a signature made by any key (no
+# secret key is used anywhere), and the fee, sequence number, resource
+# limits and resource fee are arbitrary fixed numbers. The footprint and
+# authorization list are empty.
+#
+# The signature does not sign anything: it is not a submitted transaction
+# and was never observed on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-transaction-envelope-upload-contract-wasm"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A `TransactionEnvelope` whose host function is `UPLOAD_CONTRACT_WASM` round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAACRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkQAEk+AAAAAAAFanNQAAAAAAAAAAAAAAAQAAAAAAAAAYAAAAAgAAAAgAYXNtAQAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAD6AAAAGQAAABkAAAAAAAAA+gAAAABkpKSkgAAAECSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKS"

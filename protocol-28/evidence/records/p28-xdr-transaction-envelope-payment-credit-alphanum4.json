@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-envelope-payment-credit-alphanum4",
+  "fixtureSha256": "670bcac89855c952797086b8021faff261806485a7a87dd3259823ec95fd9077",
+  "method": "structural",
+  "checkedAt": "2026-11-20T11:51:26Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "178b2e8c9a279e7cab1660d0ee3958e36c560b7b"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

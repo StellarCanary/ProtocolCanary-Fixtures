@@ -1,0 +1,1 @@
+- Add a Protocol 28 `TransactionEnvelope` fixture for the `UPLOAD_CONTRACT_WASM` host function arm, with a deterministic minimal Wasm payload and a structural evidence record.

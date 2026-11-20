@@ -1,0 +1,48 @@
+# Protocol 28 / TransactionEnvelope: a 29-byte text memo is rejected.
+#
+# Complements p28-xdr-transaction-envelope-memo-text-max.toml: `MEMO_TEXT`
+# is a `string<28>`, so a 29-byte value is outside the declared bound. A
+# decoder that reads the length prefix without enforcing the type's maximum
+# would accept a memo the protocol cannot produce.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `union Memo` and `enum MemoType` — Stellar-transaction.x lines
+#     754-771; the text arm is `string<28>`.
+#
+# Malformation rule (documented, deterministic): this value_base64 starts
+# from the 232-byte crate-produced encoding in
+# p28-xdr-transaction-envelope-memo-text-max.toml, whose 28-byte memo text
+# is "ABCDEFGHIJKLMNOPQRSTUVWXYZ12". Exactly one field is changed and one
+# byte is added: the memo text's 4-byte length prefix is changed from 28
+# (0x0000001c) to 29 (0x0000001d), and one extra text byte 'X' plus three
+# zero padding bytes are inserted after the original 28 text bytes so the
+# remainder of the envelope stays aligned. Every other byte is unchanged.
+# The result is a whole, well-formed envelope apart from the memo text
+# exceeding its declared maximum; it is 236 bytes long.
+#
+# Generated and checked on 2026-11-20 (UTC) with the official
+# `stellar-xdr` 28.0.1 crate (features base64 and alloc; rustc 1.100.0
+# (0ef1bc386 2026-11-09)): TransactionEnvelope::from_xdr_base64 returns
+# Err ("xdr value max length exceeded") for this input, while the
+# unmodified 232-byte encoding it was derived from decodes and round-trips
+# successfully with the same crate. The rejection is the exceeded text
+# limit itself, not a truncation or an unrecognised discriminant.
+#
+# The source value was built with the pinned crate; the length and payload
+# change above is the only mutation. Every byte is a synthetic structural
+# value, not a capture of a real network object. Nothing here was observed
+# on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-transaction-envelope-memo-text-too-long"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A `TransactionEnvelope` with a 29-byte `MEMO_TEXT` is correctly rejected"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "decode-failure"
+value_base64 = "AAAAAgAAAABhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYQABhqAAAAAAAF0UIQAAAAAAAAABAAAAHUFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaMTJYAAAAAAAAAQAAAAAAAAABAAAAAGJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiAAAAAAAAAAAAAA+gAAAAAAAAAAFjY2NjAAAAQGNjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2M="

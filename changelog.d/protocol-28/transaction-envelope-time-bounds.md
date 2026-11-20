@@ -1,0 +1,1 @@
+- Add a Protocol 28 `TransactionEnvelope` fixture for `PRECOND_TIME` with explicit minimum and maximum time bounds.

@@ -1,0 +1,1 @@
+- Add Protocol 28 `TransactionEnvelope` fixtures for the maximum 28-byte text memo, the maximum uint64 memo ID, `MEMO_HASH`, `MEMO_RETURN`, and a rejected 29-byte text memo.
