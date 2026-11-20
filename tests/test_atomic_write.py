@@ -400,6 +400,13 @@ class BaselineHashTest(unittest.TestCase):
     checksum against a half-written archive would be defeated.
 
     The values were recorded by building the same four artifacts from
+    ``upstream/main`` at ec10f95, before this branch changed any tool,
+    re-recorded on 2026-10-26 when the three protocol-28 boundary fixtures
+    (issue #340) changed the pack's content, and re-recorded on 2026-11-20
+    when the protocol-28 CREATE_ACCOUNT fixture (issue #540) added to the pack's
+    content: a content change legitimately moves all four hashes, while the
+    property being pinned stays the same -- the atomic write reproduces
+    whatever bytes the tools produce.
     ``upstream/main`` at ec10f95, before this branch changed any tool, and
     re-recorded on 2026-11-20 when the Protocol 28 ScVal schema, null-map,
     scalar-endpoint and wide-integer fixtures (issues #503-#506) changed the
@@ -418,13 +425,13 @@ class BaselineHashTest(unittest.TestCase):
 
     BASELINE = {
         "protocolcanary-fixtures-1.0.0.tar.gz":
-            "4ba0cd506a3e26601759dbc3885a88e5721a96367974bc0b1838ade0c3b43f89",
+            "42ca9cba0e172d0d292a543fa89dc3d5594479dc1c9cc5a475bf5d64b544af3b",
         "protocolcanary-fixtures-1.0.0.manifest.json":
-            "54348170d10e8b0a8fcd9c2b18dba113a546983dfbfd60c6b6a6fb67285ca0bc",
+            "915fa05899b5e9c5323e419f507cb3a0820e300280190fb53005e769b519b8d2",
         "protocolcanary-fixtures-1.0.0.tar.gz.sha256":
-            "33801c3864d694389307619e833ec4a7521d883be065634d3433114454e8ded5",
+            "118a0f738da127d68cc59e287f582476b2feb6f5656d64b0a0f1950f2e55e098",
         "registry-v1.json":
-            "cecd3fc528955f214e988c11f4e6fac13a7e4462168c13e195b43ea0815e13e8",
+            "f755fabc53fbb00e0e1ea575866608775bb1072ecbd484d8d93bf11712846dcd",
     }
 
     def setUp(self) -> None:

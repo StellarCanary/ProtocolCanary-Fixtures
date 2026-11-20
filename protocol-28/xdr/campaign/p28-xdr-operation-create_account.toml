@@ -1,0 +1,80 @@
+# Protocol 28 / TransactionEnvelope V1: OperationBody::CREATE_ACCOUNT roundtrip.
+#
+# There is no Protocol 28 envelope in the pack whose OperationBody discriminant
+# selects CREATE_ACCOUNT. Its payload is AccountID followed by signed
+# startingBalance, so a roundtrip fixture verifies both the variant and its
+# exact field order.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010
+#   * `struct TransactionV1Envelope` — Stellar-transaction.x lines 967-973
+#   * `struct Transaction` — Stellar-transaction.x lines 932-965
+#   * `struct Operation` — Stellar-transaction.x lines 653-719
+#   * `enum OperationType` — Stellar-transaction.x lines 39-68 (CREATE_ACCOUNT = 0)
+#   * `struct CreateAccountOp` — Stellar-transaction.x lines 70-74
+#   * `typedef PublicKey AccountID` — Stellar-types.x line 84
+#   * `union PublicKey` — Stellar-types.x lines 53-57
+#   * `typedef int64` — 64-bit signed integer
+#
+# Why it matters: CREATE_ACCOUNT creates and funds a new account. A decoder that
+# mis-handles the CREATE_ACCOUNT discriminant (OperationType 0), the AccountID
+# destination, or the signed startingBalance boundary value would fail to decode
+# account creation transactions correctly.
+#
+# The payload was produced by a program that builds the typed value
+# with the official `stellar-xdr` 28.0.1 crate (features base64 and
+# alloc) and serialises it with WriteXdr::to_xdr_base64(Limits::none()).
+#
+# Generation expression:
+#
+#   TransactionEnvelope::Tx(TransactionV1Envelope {
+#       tx: Transaction {
+#           source_account: MuxedAccount::Ed25519(Uint256([0x44; 32])),
+#           fee: 100_000,
+#           seq_num: SequenceNumber(2_345_678),
+#           cond: Preconditions::None,
+#           memo: Memo::None,
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::CreateAccount(CreateAccountOp {
+#                   destination: AccountId(PublicKey::PublicKeyTypeEd25519(
+#                       Uint256([0x55; 32]))),
+#                   starting_balance: 9_223_372_036_854_775_807, // i64::MAX
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionExt::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x66; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x66; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   }).to_xdr_base64(Limits::none())
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.99.1 (58cf8f9c3 2026-10-13);
+# generated 2026-11-20 (UTC). The same crate round-tripped the value:
+# TransactionEnvelope::from_xdr_base64 followed by to_xdr reproduced the
+# 196-byte encoding exactly, byte for byte.
+#
+# Every payload byte is a synthetic structural value, not a capture of a
+# real network object: the 0x44-filled source account and the 0x55-filled
+# destination AccountID are synthetic sentinels, not real accounts.
+# The startingBalance is the official typed int64 boundary value (i64::MAX).
+# The signature is filler sentinels and does not sign anything: it is not
+# a submitted transaction and was never observed on a network.
+#
+# Authoritative definitions:
+# Pinned Stellar-transaction.x:
+# https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+# Pinned Stellar-types.x:
+# https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-types.x
+
+id = "p28-xdr-operation-create_account"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A Protocol 28 TransactionEnvelope V1 embedding OperationBody::CREATE_ACCOUNT round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAABERERERERERERERERERERERERERERERERERERERERERAABhqAAAAAAACPKzgAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVf/////////8AAAAAAAAAAWZmZmYAAABAZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZg=="
