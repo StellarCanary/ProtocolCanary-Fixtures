@@ -376,6 +376,25 @@ class EdgeCaseTests(unittest.TestCase):
         code = digests.run_compare(results, ["ubuntu-latest-py3.11"])
         self.assertEqual(code, 0)
 
+    def test_a_result_document_with_non_dict_root_is_reported(self) -> None:
+        results = self.root / "artifacts"
+        results.mkdir(parents=True)
+        (results / "list-root.json").write_text("[1, 2, 3]", encoding="utf-8")
+        with self.assertRaises(digests.DigestError) as ctx:
+            digests.load_results(results)
+        self.assertIn("is not an archive-digest result document", str(ctx.exception))
+
+    def test_a_result_document_missing_uncompressed_sha256_is_reported(self) -> None:
+        results = self.root / "artifacts"
+        results.mkdir(parents=True)
+        (results / "missing-digest.json").write_text(
+            json.dumps({"cell": "cell-a", "compressedSha256": "a" * 64}),
+            encoding="utf-8",
+        )
+        with self.assertRaises(digests.DigestError) as ctx:
+            digests.load_results(results)
+        self.assertIn("is not an archive-digest result document", str(ctx.exception))
+
     def test_three_cells_with_two_digests_are_all_compared(self) -> None:
         results = self.root / "artifacts"
         stream = build_tar_stream(self.root)

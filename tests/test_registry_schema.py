@@ -39,14 +39,18 @@ def check_manifest(record: dict) -> None:
     assert isinstance(record["fixtures"], list) and record["fixtures"], (
         "fixtures must be a non-empty array"
     )
+    seen_ids: set[str] = set()
     for entry in record["fixtures"]:
         assert set(entry) <= _ENTRY_FIELDS, f"undeclared: {set(entry) - _ENTRY_FIELDS}"
         assert isinstance(entry.get("id"), str) and entry["id"]
+        fid = entry["id"]
+        assert fid not in seen_ids, f"duplicate fixture id: {fid}"
+        seen_ids.add(fid)
         assert isinstance(entry.get("path"), str) and entry["path"].endswith(".toml"), (
             "fixture path must end in .toml"
         )
         assert _SHA.match(entry.get("sha256", "")), "sha256 must be 64 lowercase hex"
-        assert entry.get("surface") in _SURFACES
+        assert entry.get("surface") in _SURFACES, f"unsupported surface: {entry.get('surface')}"
         assert isinstance(entry.get("category"), str) and entry["category"]
         assert isinstance(entry.get("description"), str) and entry["description"]
         assert isinstance(entry.get("payloads"), list)
@@ -136,6 +140,22 @@ class RegistrySchemaTest(unittest.TestCase):
                 mutate(record)
                 with self.assertRaisesRegex(AssertionError, expected):
                     check_manifest(record)
+
+    def test_invalid_surface_enum_rejected(self) -> None:
+        """Unsupported surface types are rejected."""
+        record = copy.deepcopy(MANIFEST)
+        record["fixtures"][0]["surface"] = "unsupported_surface"
+        with self.assertRaisesRegex(AssertionError, "unsupported surface"):
+            check_manifest(record)
+
+    def test_duplicate_fixture_ids_rejected(self) -> None:
+        """Duplicate fixture IDs across entries are rejected."""
+        record = copy.deepcopy(MANIFEST)
+        dup = copy.deepcopy(record["fixtures"][0])
+        dup["category"] = "different-category"
+        record["fixtures"].append(dup)
+        with self.assertRaisesRegex(AssertionError, "duplicate fixture id"):
+            check_manifest(record)
 
 
 if __name__ == "__main__":
