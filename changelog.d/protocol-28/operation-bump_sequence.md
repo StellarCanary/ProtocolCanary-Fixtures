@@ -1,0 +1,1 @@
+- Add a Protocol 28 TransactionEnvelope fixture embedding a BUMP_SEQUENCE operation with the signed int64 boundary value.

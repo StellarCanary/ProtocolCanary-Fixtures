@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-operation-bump_sequence",
+  "fixtureSha256": "8ee4691affa585d0912c83753046b23451eb1f41b348e22a93fd528e89b10939",
+  "method": "structural",
+  "checkedAt": "2026-11-21T03:10:29Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "249b523f90d820917564550d6018c988ce4a8536"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

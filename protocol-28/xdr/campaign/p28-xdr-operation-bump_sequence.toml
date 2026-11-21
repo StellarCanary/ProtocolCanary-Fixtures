@@ -1,0 +1,82 @@
+# Protocol 28 / TransactionEnvelope: a BUMP_SEQUENCE operation with signed int64 boundary value round-trips.
+#
+# What this tests:
+# Embeds one BUMP_SEQUENCE operation into a Protocol 28 TransactionEnvelope V1.
+# Its payload is a signed SequenceNumber int64; the boundary vector verifies the field
+# width and placement after the operation discriminant (OperationType 11).
+# The sequence number is set to the signed int64 minimum boundary value:
+# -9223372036854775808 (i64::MIN, -(1 << 63)).
+#
+# Why it matters:
+# No pack envelope selects BUMP_SEQUENCE. A decoder that assumes unsigned sequence
+# numbers, miscalculates field width, or mispositions the field offset following
+# the operation discriminant would fail or corrupt subsequent fields.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010;
+#   * `struct TransactionV1Envelope` — Stellar-transaction.x lines 967-973;
+#   * `struct Transaction` — Stellar-transaction.x lines 932-965;
+#   * `struct Operation` — Stellar-transaction.x lines 653-719;
+#   * `enum OperationType` (BUMP_SEQUENCE = 11) — Stellar-transaction.x lines 480-508;
+#   * `struct BumpSequenceOp` — Stellar-transaction.x lines 603-607;
+#   * `typedef int64 SequenceNumber` — Stellar-types.x line 71.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a
+# decoder must accept this value and re-encoding it must reproduce
+# value_base64 byte for byte, not merely an equal value.
+#
+# The payload was produced by building the typed value with the official
+# `stellar-xdr 28.0.1` crate (features base64, alloc and std — the crate version
+# Protocol-Canary's canary-xdr pins for Protocol 28; rustc 1.99.0)
+# on 2026-11-21 (UTC) and serializing it with WriteXdr::to_xdr_base64(Limits::none()),
+# never hand-assembled.
+#
+# Generation expression, recorded verbatim:
+#
+#   TransactionEnvelope::Tx(TransactionV1Envelope {
+#       tx: Transaction {
+#           source_account: MuxedAccount::Ed25519(Uint256([0x44; 32])),
+#           fee: 100_000,
+#           seq_num: SequenceNumber(2_345_678),
+#           cond: Preconditions::None,
+#           memo: Memo::None,
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::BumpSequence(BumpSequenceOp {
+#                   bump_to: SequenceNumber(-9223372036854775808),
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionExt::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x66; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x66; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   }).to_xdr_base64(Limits::none())
+#
+# The same crate round-tripped the value: TransactionEnvelope::from_xdr_base64
+# followed by to_xdr reproduced the 160-byte encoding exactly, byte for byte.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Synthetic structural values: the signed boundary demonstrates XDR representation only.
+# It does not claim the sequence is valid for an account or accepted by a network.
+# Construct the complete envelope with typed official XDR values. The fixture must not
+# be described as a transaction that passes protocol validation, ledger application,
+# authorization, Soroban execution, or network submission. Keep expected bytes and
+# evidence tied to the pinned crate and schema.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-operation-bump_sequence"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A Protocol 28 `TransactionEnvelope` containing a `BUMP_SEQUENCE` operation with the signed int64 boundary value round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAABERERERERERERERERERERERERERERERERERERERERERAABhqAAAAAAACPKzgAAAAAAAAAAAAAAAQAAAAAAAAALgAAAAAAAAAAAAAAAAAAAAWZmZmYAAABAZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZg=="
