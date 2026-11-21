@@ -1,0 +1,1 @@
+- Add Protocol 28 `TransactionEnvelope` operation vector length boundary fixtures for empty (0), maximum (100) and over-limit (101) counts.\n

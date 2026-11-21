@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-operation-count-maximum",
+  "fixtureSha256": "4cbe1cc9ff3d3651e5f91db305c7c3ea69d57590f62775b63aca51f8bec118fb",
+  "method": "structural",
+  "checkedAt": "2026-11-21T04:14:59Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "249b523f90d820917564550d6018c988ce4a8536"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}
