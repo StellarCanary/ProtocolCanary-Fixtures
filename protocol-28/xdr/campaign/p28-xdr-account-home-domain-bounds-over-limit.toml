@@ -1,0 +1,31 @@
+# Protocol 28 / AccountEntry homeDomain string32 over-limit rejection fixture.
+#
+# This value is derived from the documented accepted maximum fixture
+# p28-xdr-account-home-domain-bounds-maximum by replacing the four-byte
+# big-endian word at byte offset 72 (the homeDomain string32 length prefix)
+# from 32 to 33. No other byte is changed.
+#
+# The maximum encoding was produced by building the typed value below with
+# the official stellar-xdr 28.0.1 crate (features base64 and alloc) and
+# serialising it with to_xdr_base64(Limits::none()). Decoding the mutated
+# bytes with that crate's LedgerEntry::from_xdr returns
+# "xdr value max length exceeded"; the independent Python codec reports
+# that length prefix 33 exceeds the maximum allowed 32.
+# Accepted-value construction expression: LedgerEntry { last_modified_ledger_seq: 1_234_567, data: LedgerEntryData::Account(AccountEntry { account_id: AccountId(PublicKey::PublicKeyTypeEd25519(Uint256([0x11; 32]))), balance: 100_000_000, seq_num: SequenceNumber(42), num_sub_entries: 0, inflation_dest: None, flags: 0, home_domain: String32::try_from(vec![b'a'; 32]).unwrap(), thresholds: Thresholds([1, 0, 0, 0]), signers: VecM::try_from(Vec::<Signer>::new()).unwrap(), ext: AccountEntryExt::V0 }), ext: LedgerEntryExt::V0 }
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated 2026-11-24 (UTC).
+#
+# This is a synthetic, offline structural mutation. It proves RFC 4506 and
+# string32 bound enforcement only, not network acceptance or ledger state.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-account-home-domain-bounds-over-limit"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "A homeDomain length of 33 is rejected by the string32 bound"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "decode-failure"
+value_base64 = "ABLWhwAAAAAAAAAAEREREREREREREREREREREREREREREREREREREREREREAAAAABfXhAAAAAAAAAAAqAAAAAAAAAAAAAAAAAAAAIWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhAQAAAAAAAAAAAAAAAAAAAA=="

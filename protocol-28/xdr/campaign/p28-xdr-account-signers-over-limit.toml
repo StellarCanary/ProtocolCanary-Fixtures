@@ -1,0 +1,29 @@
+# Protocol 28 / AccountEntry signers vector over-limit rejection fixture.
+#
+# This value is derived from the documented accepted 20-signer fixture
+# p28-xdr-account-signers-maximum by replacing the four-byte big-endian word
+# at byte offset 92 (the signers vector length prefix) from 20 to 21. No
+# other byte is changed.
+#
+# The maximum encoding was produced with the official stellar-xdr 28.0.1
+# crate (features base64 and alloc) using the expression recorded in that
+# fixture. Decoding the mutated bytes with that crate's LedgerEntry::from_xdr
+# returns "xdr value max length exceeded"; the independent Python codec
+# reports that the signers length prefix 21 exceeds the maximum 20.
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated 2026-11-24 (UTC).
+#
+# This is a synthetic, offline structural mutation. It proves the RFC 4506
+# vector bound only, not network acceptance, signer validity or ledger state.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-account-signers-over-limit"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "A signers vector length of 21 is rejected by the MAX_SIGNERS bound"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "decode-failure"
+value_base64 = "ABLWhwAAAAAAAAAAEREREREREREREREREREREREREREREREREREREREREREAAAAABfXhAAAAAAAAAAAqAAAAAAAAAAAAAAAAAAAADGV4YW1wbGUudGVzdAEAAAAAAAAVAAAAAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAAAAAQAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAEAAAAAAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAABAAAAAAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAAAAQAAAAAFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQAAAAEAAAAABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYAAAABAAAAAAcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHAAAAAQAAAAAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAAAAAEAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkAAAABAAAAAAoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKAAAAAQAAAAALCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwAAAAEAAAAADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwAAAABAAAAAA0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NAAAAAQAAAAAODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODgAAAAEAAAAADw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8AAAABAAAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQAAAAAQAAAAAREREREREREREREREREREREREREREREREREREREREREQAAAAEAAAAAEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhIAAAABAAAAABMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTAAAAAQAAAAAUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFAAAAAEAAAAAAAAAAA=="

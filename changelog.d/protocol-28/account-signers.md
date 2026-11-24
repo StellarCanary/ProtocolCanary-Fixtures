@@ -1,0 +1,1 @@
+- Add Protocol 28 account fixtures for signer key arms and the 20-signer capacity bound.

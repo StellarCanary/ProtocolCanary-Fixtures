@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-account-home-domain-bounds-empty",
+  "fixtureSha256": "4dcddcdc876675f3fdeb5575e31bb22cc23081eb6110ebb90340a69383951b6b",
+  "method": "structural",
+  "checkedAt": "2026-11-24T19:21:15Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "784d4fd391507661f629e4d35dbb04b812ba3f13"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

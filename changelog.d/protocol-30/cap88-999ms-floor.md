@@ -1,0 +1,1 @@
+- Add Protocol 30 CAP-88 fixtures that pin floor rounding for a 999 ms close-time remainder.

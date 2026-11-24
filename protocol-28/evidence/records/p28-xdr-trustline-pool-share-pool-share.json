@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-trustline-pool-share-pool-share",
+  "fixtureSha256": "e9ec278268f3058806e529a749cd2d2df00846bacf101d410726ee1812287305",
+  "method": "structural",
+  "checkedAt": "2026-11-24T19:21:23Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "784d4fd391507661f629e4d35dbb04b812ba3f13"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

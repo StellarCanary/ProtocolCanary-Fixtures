@@ -1,0 +1,29 @@
+# Protocol 28 / AccountEntry signers vector capacity fixture.
+#
+# This case holds the declared MAX_SIGNERS bound of 20 distinct Ed25519
+# signers with weight 1. All other AccountEntry fields match the
+# reference-only baseline fixture p28-xdr-ledger-entry-account.
+#
+# Expected bytes were produced by building the typed value below with the
+# official stellar-xdr 28.0.1 crate (features base64 and alloc) and
+# serialising it with to_xdr_base64(Limits::none()). A round trip in the
+# same program reproduced the bytes exactly.
+# Construction expression: LedgerEntry { last_modified_ledger_seq: 1_234_567, data: LedgerEntryData::Account(AccountEntry { account_id: AccountId(PublicKey::PublicKeyTypeEd25519(Uint256([0x11; 32]))), balance: 100_000_000, seq_num: SequenceNumber(42), num_sub_entries: 0, inflation_dest: None, flags: 0, home_domain: String32::try_from(b"example.test".to_vec()).unwrap(), thresholds: Thresholds([1, 0, 0, 0]), signers: VecM::try_from((0u8..20).map(|i| Signer { key: SignerKey::Ed25519(Uint256([i + 1; 32])), weight: 1 }).collect::<Vec<Signer>>()).unwrap(), ext: AccountEntryExt::V0 }), ext: LedgerEntryExt::V0 }
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated 2026-11-24 (UTC).
+#
+# The signer keys are synthetic placeholders, not public keys with known
+# secrets, signatures or live accounts. No network state or host behavior
+# is asserted.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-account-signers-maximum"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "An ACCOUNT LedgerEntry with 20 distinct signers round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "roundtrip"
+value_base64 = "ABLWhwAAAAAAAAAAEREREREREREREREREREREREREREREREREREREREREREAAAAABfXhAAAAAAAAAAAqAAAAAAAAAAAAAAAAAAAADGV4YW1wbGUudGVzdAEAAAAAAAAUAAAAAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAAAAAQAAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgAAAAEAAAAAAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMAAAABAAAAAAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEAAAAAQAAAAAFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQAAAAEAAAAABgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYAAAABAAAAAAcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHAAAAAQAAAAAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAAAAAEAAAAACQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkAAAABAAAAAAoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKAAAAAQAAAAALCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwAAAAEAAAAADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwAAAABAAAAAA0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NAAAAAQAAAAAODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODgAAAAEAAAAADw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8AAAABAAAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQAAAAAQAAAAAREREREREREREREREREREREREREREREREREREREREREQAAAAEAAAAAEhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhIAAAABAAAAABMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTAAAAAQAAAAAUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFAAAAAEAAAAAAAAAAA=="

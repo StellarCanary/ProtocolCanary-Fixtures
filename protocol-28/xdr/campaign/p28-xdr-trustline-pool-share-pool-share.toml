@@ -1,0 +1,30 @@
+# Protocol 28 / TrustLineAsset pool-share arm fixture.
+#
+# This TRUSTLINE entry uses the ASSET_TYPE_POOL_SHARE discriminant (3) and
+# a 32-byte PoolID instead of an AlphaNum4 code and issuer pair. All other
+# TrustLineEntry fields match the reference-only baseline fixture
+# p28-xdr-ledger-entry-trustline.
+#
+# Expected bytes were produced by building the typed value below with the
+# official stellar-xdr 28.0.1 crate (features base64 and alloc) and
+# serialising it with to_xdr_base64(Limits::none()). A round trip in the
+# same program reproduced the bytes exactly.
+# Construction expression: LedgerEntry { last_modified_ledger_seq: 1_234_568, data: LedgerEntryData::Trustline(TrustLineEntry { account_id: AccountId(PublicKey::PublicKeyTypeEd25519(Uint256([0x33; 32]))), asset: TrustLineAsset::PoolShare(PoolId(Hash([0x77; 32]))), balance: 25_000_000, limit: i64::MAX, flags: 1, ext: TrustLineEntryExt::V0 }), ext: LedgerEntryExt::V0 }
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated 2026-11-24 (UTC).
+#
+# The PoolID is a synthetic placeholder. This offline vector proves XDR
+# structure only; it does not assert that the pool exists, that a trustline
+# is authorized, or that a host accepts the asset.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-trustline-pool-share-pool-share"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "A TRUSTLINE entry with a PoolShare TrustLineAsset round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "roundtrip"
+value_base64 = "ABLWiAAAAAEAAAAAMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAADd3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3cAAAAAAX14QH//////////AAAAAQAAAAAAAAAA"
