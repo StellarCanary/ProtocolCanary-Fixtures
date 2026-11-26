@@ -1,11 +1,13 @@
 """Tests for tools/catalogue/generate_html.py (F-005, issue #274)."""
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from tools.catalogue import generate_html
+from tools.registry import generate as registry_generate
 
 
 class TestCatalogueGenerator(unittest.TestCase):
@@ -159,13 +161,46 @@ class TestCatalogueGenerator(unittest.TestCase):
             self.assertIn("Protocol Canary Fixture Catalogue", content)
 
             # Test with explicit --registry argument
-            import json
             sample_reg = Path(tmpdir) / "sample_reg.json"
             sample_reg.write_text(json.dumps(self.sample_registry), encoding="utf-8")
             out_path2 = Path(tmpdir) / "output2.html"
             code2 = generate_html.main(["--registry", str(sample_reg), "-o", str(out_path2)])
             self.assertEqual(code2, 0)
             self.assertTrue(out_path2.exists())
+
+    def test_registered_protocol_packs_generate_consistent_catalogues(self) -> None:
+        """All populated protocol packs have monotonic protocol numbers and non-empty metadata."""
+        repo_root = Path(__file__).resolve().parents[1]
+        packs = sorted(
+            p for p in repo_root.glob("protocol-*")
+            if p.is_dir() and any(p.rglob("*.toml"))
+        )
+        self.assertGreater(len(packs), 0)
+
+        protocols: list[int] = []
+        for pack in packs:
+            registry = registry_generate.build_registry(
+                registry_generate.scan_pack(pack),
+                pack_name=pack.name,
+            )
+            protocol = registry["protocol"]
+            protocols.append(protocol)
+            self.assertGreater(len(registry["fixtures"]), 0, f"{pack.name} has no fixtures")
+
+            for entry in registry["fixtures"]:
+                self.assertTrue(entry["id"].strip(), f"empty id in {pack.name}")
+                self.assertTrue(entry["surface"].strip(), f"empty surface in {entry['id']}")
+                self.assertTrue(entry["category"].strip(), f"empty category in {entry['id']}")
+                self.assertTrue(entry["description"].strip(), f"empty description in {entry['id']}")
+                self.assertTrue(entry["path"].strip(), f"empty path in {entry['id']}")
+
+            html = generate_html.generate_catalogue_html(registry)
+            md = generate_html.generate_catalogue_markdown(registry)
+            self.assertIn(f"Protocol {protocol}", html)
+            self.assertIn(f"# Protocol Canary Fixture Catalogue (Protocol {protocol})", md)
+
+        self.assertEqual(protocols, sorted(set(protocols)))
+        self.assertEqual(protocols, list(range(protocols[0], protocols[0] + len(protocols))))
 
 
 if __name__ == "__main__":

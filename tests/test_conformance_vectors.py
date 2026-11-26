@@ -81,20 +81,25 @@ class ConformanceVectorTests(unittest.TestCase):
         self.assertEqual(boundary_data["sequence_number"], 0)
         self.assertEqual(boundary_data["args"], [])
 
-    def test_soroban_contract_custom_error_codes(self) -> None:
-        """Verify contract invocations with custom user error codes (ContractError)."""
-        error_vectors = [
-            v for v in self.manifest["accepted"]
-            if v["surface"] == "soroban"
+    def test_soroban_vectors_cover_expect_and_error_diagnostics(self) -> None:
+        """Soroban conformance vectors cover both valid expectations and Soroban error diagnostics."""
+        accepted_soroban = [
+            v for v in self.manifest["accepted"] if v["surface"] == "soroban"
         ]
-        self.assertGreater(len(error_vectors), 0)
-        for vector in error_vectors:
-            fixture = VECTORS_DIR / vector["path"]
-            data = tomllib.loads(fixture.read_text(encoding="utf-8"))
-            if "expect" in data and isinstance(data["expect"], dict):
-                if "error_code" in data["expect"]:
-                    self.assertIsInstance(data["expect"]["error_code"], int)
-                    self.assertGreaterEqual(data["expect"]["error_code"], 0)
+        rejected_soroban = [
+            v for v in self.manifest["rejected"] if v["surface"] == "soroban"
+        ]
+        self.assertGreater(len(accepted_soroban), 0)
+        self.assertGreater(len(rejected_soroban), 0)
+
+        for vector in accepted_soroban:
+            data = tomllib.loads((VECTORS_DIR / vector["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(data["surface"], "soroban")
+            self.assertIsInstance(data.get("expect"), dict)
+
+        rejected_codes = {vector["error_code"] for vector in rejected_soroban}
+        self.assertIn("unknown-soroban-expect-key", rejected_codes)
+        self.assertIn("wrong-soroban-message-type", rejected_codes)
 
     def test_each_vector_has_its_documented_validator_outcome(self) -> None:
         for vector in self.vectors:
@@ -140,6 +145,8 @@ class CorpusIsolationTests(unittest.TestCase):
         cls.packs = sorted(p for p in REPO_ROOT.glob("protocol-*") if p.is_dir())
 
     def test_every_vector_file_is_documented(self) -> None:
+        # Both directions: an orphan file on disk would be a vector nothing
+        # checks, and a manifest entry with no file is already caught above.
         documented = {vector["path"] for vector in self.vectors}
         on_disk = {
             path.relative_to(VECTORS_DIR).as_posix()
@@ -149,18 +156,24 @@ class CorpusIsolationTests(unittest.TestCase):
         self.assertEqual(on_disk, documented)
 
     def test_the_corpus_is_outside_every_scan_root(self) -> None:
+        # The validator discovers `protocol-*` packs. Were that widened, these
+        # files, one of which is deliberately unparseable, would be treated as
+        # consumable fixtures.
         self.assertFalse(str(VECTORS_DIR.relative_to(REPO_ROOT)).startswith("protocol-"))
         for pack in self.packs:
             self.assertNotIn(pack, VECTORS_DIR.parents)
 
     def test_vector_ids_do_not_collide_with_shipped_fixture_ids(self) -> None:
+        # Ids must be unique across everything a loader could be pointed at, so
+        # a corpus id that shadowed a real fixture id would be a trap. The
+        # unparseable syntax vector contributes no id, by construction.
         vector_ids = set()
         for vector in self.vectors:
             path = VECTORS_DIR / vector["path"]
             try:
                 vector_ids.add(tomllib.loads(path.read_text(encoding="utf-8"))["id"])
             except (tomllib.TOMLDecodeError, KeyError):
-                vector_ids.add(vector["id"])
+                self.assertEqual(vector["id"], "invalid-xdr-toml-syntax")
         shipped = {
             fixture.data["id"]
             for pack in self.packs
@@ -168,6 +181,7 @@ class CorpusIsolationTests(unittest.TestCase):
             for fixture in [validate.load_fixture(path, validate.Report())]
             if fixture is not None and "id" in fixture.data
         }
+        self.assertEqual(len(vector_ids), len(self.vectors) - 1)
         self.assertEqual(vector_ids & shipped, set())
 
 
