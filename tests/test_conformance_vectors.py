@@ -1,4 +1,3 @@
-use strict;
 """Shared fixture conformance vectors (issue #283).
 
 Run with: python3 -m unittest tests/test_conformance_vectors.py
