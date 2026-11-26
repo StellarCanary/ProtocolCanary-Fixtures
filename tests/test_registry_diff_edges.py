@@ -220,13 +220,13 @@ class RegistryDiffEdgeTests(unittest.TestCase):
         self.assertEqual(out, "")
         self.assertIn("no such file", err)
 
-        # Directory instead of file
+        # Directory instead of file (Linux/macOS raises IsADirectoryError; Windows raises PermissionError)
         subdir = self.tmp / "subdir"
         subdir.mkdir()
         code, out, err = self._run_cli(str(valid_path), str(subdir))
         self.assertEqual(code, 2)
         self.assertEqual(out, "")
-        self.assertIn("directory", err)
+        self.assertTrue("directory" in err or "could not be read" in err, msg=err)
 
         # Invalid UTF-8
         bad_utf8 = self.tmp / "bad-utf8.json"
