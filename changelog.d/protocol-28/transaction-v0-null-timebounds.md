@@ -1,0 +1,1 @@
+- Add a Protocol 28 XDR fixture for an absent `TransactionV0.timeBounds` pointer, verifying the shifted memo and operation offsets byte for byte.
