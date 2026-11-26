@@ -1,0 +1,58 @@
+# Protocol 28 / LedgerEntry: a `CONTRACT_CODE` entry with an empty code vector round-trips.
+#
+# What this tests:
+# a `CONTRACT_CODE` ledger entry: `lastModifiedLedgerSeq` 1_234_570, the
+# `CONTRACT_CODE` discriminant (7), a V0 `ContractCodeEntryExt`, a synthetic
+# 32-byte code hash and a zero-length opaque `code` field (length prefix 0, no
+# padding bytes).
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct ContractCodeEntry` — Stellar-ledger-entries.x lines 513-528
+#     (including its inline ext union and the `opaque code<>` field);
+#   * `enum LedgerEntryType` — Stellar-ledger-entries.x lines 92-104;
+#   * `struct LedgerEntry` (lastModifiedLedgerSeq, the data union and the ext
+#     union) — lines 548-586.
+#
+# Why it matters:
+# `opaque code<>` is a variable-length XDR field. A zero length has no payload
+# and no alignment bytes, so it exercises the boundary of the length-and-padding
+# path without requiring Wasm execution: a decoder that reads a padding word or
+# drops the length prefix shifts the outer `LedgerEntryExt`.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a decoder
+# must accept this entry and re-encoding it must reproduce value_base64 byte for
+# byte, not merely an equal value. The payload was produced by a program that
+# builds the typed value with the official `stellar-xdr 28.0.1` crate (features
+# base64, alloc and std) and serialises it with
+# to_xdr_base64(Limits::none()), never hand-assembled. Generation expression,
+# recorded verbatim:
+#
+#   LedgerEntry { last_modified_ledger_seq: 1_234_570, data: LedgerEntryData::ContractCode(ContractCodeEntry { ext: ContractCodeEntryExt::V0, hash: Hash([0x55; 32]), code: BytesM::try_from(vec![]).unwrap() }), ext: LedgerEntryExt::V0 }
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated
+# 2026-11-24 (UTC). The same program asserted the crate's own round trip:
+# from_xdr returned Ok and re-encoding the decoded value reproduced the
+# encoding exactly.
+#
+# Is it deterministic: yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Every payload byte is a synthetic structural value, not a capture of a real
+# ledger entry and not a contract that exists on any network: the 0x55-filled
+# code hash is a fixed placeholder, no secret key is used or represented
+# anywhere, and the ledger number is an arbitrary constant. No Wasm module is
+# represented here and nothing was observed on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-contract-code-opaque-padding-empty"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "A `CONTRACT_CODE` `LedgerEntry` with an empty opaque code byte sequence round-trips"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "roundtrip"
+value_base64 = "ABLWigAAAAcAAAAAVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUAAAAAAAAAAA=="

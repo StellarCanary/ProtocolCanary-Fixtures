@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-contract-code-opaque-padding-three-bytes",
+  "fixtureSha256": "079339bdfb5178ed51ec2437c39dc13b88c7abae235d04ff4d37c0091e72db09",
+  "method": "structural",
+  "checkedAt": "2026-11-24T13:54:52Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "de09586b69e9d758d49f42c5980e85a720b67705"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

@@ -673,6 +673,30 @@ class CommandLineTests(unittest.TestCase):
         self.assertIn("is not a usable engine inventory", err)
         self.assertIn("inventoryVersion", err)
 
+    def test_an_inventory_missing_a_fixture_category_names_the_problem(self) -> None:
+        document = inventory([engine_fixture("p28-a")])
+        document["fixtures"][0].pop("category")
+        path = write_json(self.tmp / "missing-category.json", document)
+
+        code, out, err = self.run_tool(str(path), str(self.registry_path))
+
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("is not a usable engine inventory", err)
+        self.assertIn("fixtures[0].category must be a non-empty string", err)
+
+    def test_an_inventory_missing_protocol_names_the_problem(self) -> None:
+        document = inventory([engine_fixture("p28-a")])
+        document.pop("protocol")
+        path = write_json(self.tmp / "missing-protocol.json", document)
+
+        code, out, err = self.run_tool(str(path), str(self.registry_path))
+
+        self.assertEqual(code, 2)
+        self.assertEqual(out, "")
+        self.assertIn("is not a usable engine inventory", err)
+        self.assertIn("'protocol' must be a positive integer", err)
+
     def test_an_unusable_registry_names_the_problem(self) -> None:
         write_json(self.tmp / "registry2.json", registry([], version=2))
         code, _, err = self.run_tool(str(self.inventory_path), str(self.tmp / "registry2.json"))

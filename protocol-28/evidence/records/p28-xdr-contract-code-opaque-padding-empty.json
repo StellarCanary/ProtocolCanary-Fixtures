@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-contract-code-opaque-padding-empty",
+  "fixtureSha256": "1afa50e20efced05920e9a0e8c6ef86490d2d2cdd6445029aab775694e75a0bd",
+  "method": "structural",
+  "checkedAt": "2026-11-24T13:54:52Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "de09586b69e9d758d49f42c5980e85a720b67705"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

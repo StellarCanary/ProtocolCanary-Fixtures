@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-contract-data-value-symbol-symbol-value",
+  "fixtureSha256": "e2e5d69fd73b0ab28d67f5d6e57ec6071844111525542ecf4f8fa7e43087b02b",
+  "method": "structural",
+  "checkedAt": "2026-11-24T13:54:43Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "de09586b69e9d758d49f42c5980e85a720b67705"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

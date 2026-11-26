@@ -1,0 +1,1 @@
+- Add Protocol 28 `LedgerEntry` fixtures for `CONTRACT_CODE` entries with empty and three-byte opaque code vectors, covering the zero-length and one-padding-byte paths of `opaque code<>`, generated with the official `stellar-xdr` 28.0.1 crate.

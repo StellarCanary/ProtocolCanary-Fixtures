@@ -260,5 +260,83 @@ class StrictnessTests(MatrixCase):
         self.assertIn("expected object", self.errors(matrix))
 
 
+class UnknownProtocolTests(MatrixCase):
+    """Issue #595: behavior when an unknown protocol ID is passed to validation.
+
+    The ``protocols`` object uses ``patternProperties`` to allow any valid
+    numeric string key, so a structurally complete section for a hypothetical
+    protocol 99 passes the JSON Schema. The tests here assert that:
+
+    * the shipped matrix contains only the documented protocols;
+    * the error messages correctly identify the unknown protocol's JSON path
+      when its component data is malformed;
+    * non-numeric keys that cannot be protocol IDs are rejected outright.
+    """
+
+    def test_unknown_protocol_99_is_not_in_the_shipped_matrix(self) -> None:
+        self.assertNotIn("99", self.matrix["protocols"])
+        self.assertNotIn("0", self.matrix["protocols"])
+
+    def test_malformed_range_on_unknown_protocol_names_the_protocol_path(self) -> None:
+        # An invalid semver range on protocol 99 must produce an error that
+        # names $.protocols.99.stellar-core.range so a contributor can locate
+        # and fix the problem immediately.
+        matrix = self.mutated()
+        section = copy.deepcopy(matrix["protocols"]["28"])
+        section["stellar-core"]["range"] = "not-a-range"
+        matrix["protocols"]["99"] = section
+        text = self.errors(matrix)
+        self.assertIn("$.protocols.99.stellar-core.range", text, text)
+
+    def test_all_three_components_of_unknown_protocol_report_their_own_path(self) -> None:
+        # Every component with a bad range produces its own located message.
+        matrix = self.mutated()
+        section = {
+            name: {"repository": comp["repository"], "range": "INVALID"}
+            for name, comp in matrix["protocols"]["28"].items()
+        }
+        matrix["protocols"]["99"] = section
+        text = self.errors(matrix)
+        for component in COMPONENTS:
+            self.assertIn(f"$.protocols.99.{component}.range", text, component)
+
+    def test_unknown_protocol_with_valid_structure_is_accepted_by_schema(self) -> None:
+        # The schema uses patternProperties so any correctly formed numeric
+        # string key is structurally valid; the range convention is enforced
+        # by the range-is-the-release-line test, not the schema.
+        matrix = self.mutated()
+        matrix["protocols"]["99"] = copy.deepcopy(matrix["protocols"]["28"])
+        self.assertEqual(self.errors(matrix), "")
+
+    def test_non_numeric_protocol_key_is_rejected_as_unexpected_property(self) -> None:
+        # Keys that do not look like a protocol number are unexpected.
+        for bad_key in ("unknown", "v99", "latest-protocol", "29a"):
+            with self.subTest(key=bad_key):
+                matrix = self.mutated()
+                matrix["protocols"][bad_key] = copy.deepcopy(matrix["protocols"]["28"])
+                self.assertIn(
+                    f"unexpected property {bad_key!r}", self.errors(matrix), bad_key
+                )
+
+    def test_unknown_protocol_missing_a_component_is_rejected_with_path(self) -> None:
+        # Dropping ``soroban-rpc`` from protocol 99 must name ``$.protocols.99``.
+        matrix = self.mutated()
+        section = copy.deepcopy(matrix["protocols"]["28"])
+        del section["soroban-rpc"]
+        matrix["protocols"]["99"] = section
+        text = self.errors(matrix)
+        self.assertIn("$.protocols.99", text, text)
+        self.assertIn("missing required property 'soroban-rpc'", text, text)
+
+    def test_unknown_protocol_with_extra_component_is_rejected(self) -> None:
+        # An extra key inside a protocol section is unexpected regardless of
+        # whether the outer protocol key is known.
+        matrix = self.mutated()
+        section = copy.deepcopy(matrix["protocols"]["28"])
+        section["horizon"] = {"repository": "stellar/go", "range": ">=99.0.0 <100.0.0"}
+        matrix["protocols"]["99"] = section
+        self.assertIn("unexpected property 'horizon'", self.errors(matrix))
+
+
 if __name__ == "__main__":
     unittest.main()

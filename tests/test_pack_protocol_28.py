@@ -10,13 +10,20 @@ on why CI does not require a live RPC endpoint.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 import re
+import shutil
 import sys
+import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 VALIDATE_PATH = REPO_ROOT / "tools" / "validate" / "validate.py"
 
 _spec = importlib.util.spec_from_file_location("validate", VALIDATE_PATH)
@@ -25,8 +32,106 @@ assert _spec.loader is not None
 sys.modules["validate"] = validate
 _spec.loader.exec_module(validate)
 
+from tools.pack import pack
+from tools.registry import generate as registry_generate
+from tools.validate import jsonschema_lite
+
 PACK = REPO_ROOT / "protocol-28"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
+FIXTURE_SCHEMA_PATH = REPO_ROOT / "schemas" / "fixture-v1.schema.json"
+FEE_STATS_FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "rpc" / "get-fee-stats.toml"
+FEE_STATS_VECTOR_PATH = REPO_ROOT / "tests" / "vectors" / "rpc" / "get-fee-stats.json"
+
+FEE_PERCENTILE_KEYS = (
+    "min",
+    "p10",
+    "p20",
+    "p30",
+    "p40",
+    "p50",
+    "p60",
+    "p70",
+    "p80",
+    "p90",
+    "p95",
+    "p99",
+    "max",
+)
+
+# Test-local JSON Schema mirroring Stellar RPC's documented `getFeeStats`
+# response structure; `schemas/fee-stats.schema.json` is not shipped in `schemas/`.
+_FEE_DISTRIBUTION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "max",
+        "min",
+        "mode",
+        "p10",
+        "p20",
+        "p30",
+        "p40",
+        "p50",
+        "p60",
+        "p70",
+        "p80",
+        "p90",
+        "p95",
+        "p99",
+        "transactionCount",
+        "ledgerCount",
+    ],
+    "properties": {
+        **{
+            key: {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"}
+            for key in (
+                "max",
+                "min",
+                "mode",
+                "p10",
+                "p20",
+                "p30",
+                "p40",
+                "p50",
+                "p60",
+                "p70",
+                "p80",
+                "p90",
+                "p95",
+                "p99",
+                "transactionCount",
+            )
+        },
+        "ledgerCount": {"type": "integer", "minimum": 0},
+    },
+}
+
+FEE_STATS_RESULT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["sorobanInclusionFee", "inclusionFee", "latestLedger"],
+    "properties": {
+        "sorobanInclusionFee": _FEE_DISTRIBUTION_SCHEMA,
+        "inclusionFee": _FEE_DISTRIBUTION_SCHEMA,
+        "latestLedger": {"type": "integer", "minimum": 1},
+    },
+}
+
+
+def check_fee_percentiles_monotonic(distribution: dict) -> list[str]:
+    """Return errors if fee percentile brackets are not monotonically non-decreasing."""
+    errors: list[str] = []
+    previous_key = FEE_PERCENTILE_KEYS[0]
+    previous_value = int(distribution[previous_key])
+    for key in FEE_PERCENTILE_KEYS[1:]:
+        current_value = int(distribution[key])
+        if current_value < previous_value:
+            errors.append(
+                f"{key} ({current_value}) is less than {previous_key} ({previous_value})"
+            )
+        previous_key = key
+        previous_value = current_value
+    return errors
 
 EXPECTED_IDS_BY_SURFACE = {
     "xdr": {
@@ -238,6 +343,84 @@ class Protocol28PackTests(unittest.TestCase):
                 allowed_dirs,
                 f"Fixture file {relative_path} is located outside allowed subdirectories ({allowed_dirs})",
             )
+
+
+class Protocol28FeeStatsTests(unittest.TestCase):
+    """Fee-stats fixture, schema, percentile monotonicity, and manifest tests (#608).
+
+    Note: ``schemas/fee-stats.schema.json`` does not exist in ``schemas/`` and
+    ``protocol-28/`` ships ``p28-rpc-network`` and ``p28-rpc-latest-ledger``
+    rather than a live ``get-fee-stats`` fixture. These tests verify the
+    repository's Protocol 28 ``tests/fixtures/rpc/get-fee-stats.toml`` fixture,
+    the captured ``tests/vectors/rpc/get-fee-stats.json`` vector against a
+    test-local JSON Schema via ``jsonschema_lite``, percentile monotonicity
+    (including p10 <= p50 <= p90 <= p99), and archive manifest inclusion.
+    """
+
+    def test_fee_stats_fixture_conforms_to_protocol_28_and_fixture_schema(self) -> None:
+        fixture_data = tomllib.loads(FEE_STATS_FIXTURE_PATH.read_text(encoding="utf-8"))
+        fixture_schema = json.loads(FIXTURE_SCHEMA_PATH.read_text(encoding="utf-8"))
+        rpc_method_schema = fixture_schema["allOf"][1]["then"]["properties"]["method"]
+        self.assertEqual(jsonschema_lite.validate(fixture_data["method"], rpc_method_schema), [])
+
+        with tempfile.TemporaryDirectory() as tmp:
+            fixture_copy = Path(tmp) / "get-fee-stats.toml"
+            shutil.copy2(FEE_STATS_FIXTURE_PATH, fixture_copy)
+            report = validate.validate_directory(Path(tmp))
+        self.assertEqual(report.errors, [])
+        self.assertEqual(fixture_data["protocol"], 28)
+        self.assertEqual(fixture_data["surface"], "rpc")
+        self.assertEqual(fixture_data["method"], "get-fee-stats")
+        fields = {entry["field"] for entry in fixture_data["assert"]}
+        self.assertEqual(fields, {"sorobanInclusionFee", "inclusionFee", "latestLedger"})
+
+    def test_fee_stats_vector_conforms_to_schema_and_monotonic_percentiles(self) -> None:
+        capture = json.loads(FEE_STATS_VECTOR_PATH.read_text(encoding="utf-8"))
+        result = capture["response"]["result"]
+        self.assertEqual(jsonschema_lite.validate(result, FEE_STATS_RESULT_SCHEMA), [])
+
+        for key in ("sorobanInclusionFee", "inclusionFee"):
+            with self.subTest(distribution=key):
+                dist = result[key]
+                self.assertEqual(check_fee_percentiles_monotonic(dist), [])
+                p10, p50, p90, p99 = (int(dist[p]) for p in ("p10", "p50", "p90", "p99"))
+                self.assertLessEqual(p10, p50)
+                self.assertLessEqual(p50, p90)
+                self.assertLessEqual(p90, p99)
+
+        broken_result = json.loads(json.dumps(result))
+        del broken_result["inclusionFee"]
+        self.assertTrue(jsonschema_lite.validate(broken_result, FEE_STATS_RESULT_SCHEMA))
+
+        non_monotonic = dict(result["sorobanInclusionFee"], p50="500", p90="100")
+        errors = check_fee_percentiles_monotonic(non_monotonic)
+        self.assertTrue(any("p60" in err or "p90" in err for err in errors), errors)
+
+    def test_protocol_28_archive_manifest_references_fixtures_and_fee_stats(self) -> None:
+        registry = json.loads(registry_generate.generate(PACK))
+        members, digest, protocol = pack.collect_members(PACK)
+        self.assertEqual(protocol, 28)
+        self.assertEqual(digest, registry["packDigest"])
+        archive_registry = json.loads(members["registry.json"].decode("utf-8"))
+        self.assertEqual(archive_registry, registry)
+        listed_paths = {entry["path"] for entry in archive_registry["fixtures"]}
+        self.assertIn("rpc/p28-rpc-network.toml", listed_paths)
+        self.assertIn("rpc/p28-rpc-latest-ledger.toml", listed_paths)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            temp_pack = Path(tmp) / "protocol-28"
+            shutil.copytree(PACK, temp_pack)
+            fee_dest = temp_pack / "rpc" / "get-fee-stats.toml"
+            shutil.copy2(FEE_STATS_FIXTURE_PATH, fee_dest)
+            expected_sha = hashlib.sha256(fee_dest.read_bytes()).hexdigest()
+
+            temp_members, _, temp_protocol = pack.collect_members(temp_pack)
+            self.assertEqual(temp_protocol, 28)
+            manifest = json.loads(temp_members["registry.json"].decode("utf-8"))
+            by_id = {entry["id"]: entry for entry in manifest["fixtures"]}
+            self.assertIn("test-rpc-fee-stats", by_id)
+            self.assertEqual(by_id["test-rpc-fee-stats"]["path"], "rpc/get-fee-stats.toml")
+            self.assertEqual(by_id["test-rpc-fee-stats"]["sha256"], expected_sha)
 
 
 if __name__ == "__main__":

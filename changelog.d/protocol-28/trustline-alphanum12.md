@@ -1,0 +1,1 @@
+- Add a Protocol 28 `LedgerEntry` fixture for a `TRUSTLINE` entry whose `TrustLineAsset` uses `ASSET_TYPE_CREDIT_ALPHANUM12` (2) with the fixed 12-byte code `ABCDEFGHIJKL` followed by the issuer key, generated with the official `stellar-xdr` 28.0.1 crate.

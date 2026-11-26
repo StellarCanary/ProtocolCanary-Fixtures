@@ -516,5 +516,85 @@ class VerifiedPackTests(Scratch):
             pack.check_verified_evidence(pack_dir)
 
 
+class CompressionFormatTests(Scratch):
+    """Issue #598: pack validation rejects archives with wrong compression.
+
+    A ProtocolCanary fixture archive is always a gzip-compressed tar (CF-06).
+    ``verify_archive.extract_safely`` opens archives with ``mode="r|gz"``, so
+    a plain (uncompressed) tar stream, a corrupt gzip header, or a bare gzip
+    file that wraps non-tar data are all *unreadable* rather than merely
+    *invalid*: the tool raises ``UnreadableArchive`` before it can inspect any
+    entry.  Every test here cleans up its temporary archive via the ``Scratch``
+    base class.
+    """
+
+    def _make_plain_tar(self, name: str = "plain.tar") -> Path:
+        """Write a valid fixture pack as a plain (non-gzip) tar archive."""
+        pack_dir = support.write_pack(self.root)
+        members, _, _ = pack.collect_members(pack_dir)
+        archive = self.root / name
+        raw = io.BytesIO()
+        with tarfile.open(fileobj=raw, mode="w:", format=tarfile.PAX_FORMAT) as tf:
+            for entry_name, data in sorted(members.items()):
+                info = tarfile.TarInfo(entry_name)
+                info.size = len(data)
+                info.mtime = 0
+                tf.addfile(info, io.BytesIO(data))
+        archive.write_bytes(raw.getvalue())
+        return archive
+
+    def test_uncompressed_tar_is_unreadable_by_the_safe_extractor(self) -> None:
+        archive = self._make_plain_tar()
+        dest = self.root / "dest"
+        dest.mkdir()
+        with self.assertRaises(support.verify_archive.UnreadableArchive) as caught:
+            support.verify_archive.extract_safely(archive, dest)
+        self.assertIn("cannot read the archive", str(caught.exception))
+
+    def test_uncompressed_tar_is_rejected_by_verify_archive(self) -> None:
+        archive = self._make_plain_tar()
+        with self.assertRaises(support.verify_archive.UnreadableArchive) as caught:
+            support.verify_archive.verify_archive(archive)
+        self.assertIn("cannot read the archive", str(caught.exception))
+
+    def test_uncompressed_tar_exit_code_is_2_via_cli(self) -> None:
+        # The CLI documents exit code 2 for an unusable (unreadable) archive.
+        archive = self._make_plain_tar()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            code = support.verify_archive.main([str(archive)])
+        self.assertEqual(code, 2)
+        self.assertIn("error:", err.getvalue())
+
+    def test_bare_gzip_wrapping_non_tar_data_is_unreadable(self) -> None:
+        # A gzip stream that does not contain a valid tar is also rejected.
+        import gzip as _gzip
+
+        archive = self.root / "not_a_tar.tar.gz"
+        raw = io.BytesIO()
+        with _gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as gz:
+            gz.write(b"this is not a tar archive at all\n" * 10)
+        archive.write_bytes(raw.getvalue())
+
+        dest = self.root / "dest2"
+        dest.mkdir()
+        with self.assertRaises(support.verify_archive.UnreadableArchive) as caught:
+            support.verify_archive.extract_safely(archive, dest)
+        self.assertIn("cannot read the archive", str(caught.exception))
+
+    def test_truncated_gzip_archive_is_rejected_with_format_error(self) -> None:
+        # A gzip file truncated mid-stream cannot be decoded.
+        info = self.build()
+        truncated = self.root / "truncated.tar.gz"
+        full = info.path.read_bytes()
+        truncated.write_bytes(full[: len(full) // 2])
+
+        dest = self.root / "dest3"
+        dest.mkdir()
+        with self.assertRaises(support.verify_archive.UnreadableArchive) as caught:
+            support.verify_archive.extract_safely(truncated, dest)
+        self.assertIn("cannot read the archive", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

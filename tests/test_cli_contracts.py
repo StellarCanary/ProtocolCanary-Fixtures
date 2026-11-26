@@ -1,6 +1,7 @@
 """Tests for tool command-line contracts documented in docs/tools.md (issue #351)."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -327,6 +328,29 @@ class CliContractTests(unittest.TestCase):
         # Invalid format choice (syntax error, exit 2)
         p_bad_format = self.run_tool(tool, "--format", "invalid_fmt", str(self.pack_dir))
         self.assertEqual(p_bad_format.returncode, 2)
+
+    def test_validate_cli_empty_fixture_directory(self) -> None:
+        """An empty fixture directory is a zero-fixture run, not a crash (issue #587)."""
+        empty_dir = Path(self.temp_dir) / "empty-fixtures"
+        empty_dir.mkdir()
+
+        p_empty = self.run_tool("tools/validate/validate.py", str(empty_dir))
+        self.assertEqual(p_empty.returncode, 0, p_empty.stderr)
+        self.assertIn("0 fixture file(s) valid across 1 root(s)", p_empty.stdout)
+        self.assertNotIn("Traceback", p_empty.stdout + p_empty.stderr)
+
+        # The JSON contract reports the same zero-fixture outcome with no
+        # diagnostics, so a CI consumer sees a clean run rather than an error.
+        p_json = self.run_tool(
+            "tools/validate/validate.py", "--format", "json", str(empty_dir)
+        )
+        self.assertEqual(p_json.returncode, 0, p_json.stderr)
+        self.assertEqual(p_json.stderr, "")
+        document = json.loads(p_json.stdout)
+        self.assertTrue(document["valid"])
+        self.assertEqual(document["summary"]["fixtures"], 0)
+        self.assertEqual(document["errors"], [])
+        self.assertEqual(document["warnings"], [])
 
     # 7. tools/validate/schema_sync.py
     def test_schema_sync_cli(self) -> None:

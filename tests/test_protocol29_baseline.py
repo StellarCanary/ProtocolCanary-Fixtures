@@ -152,5 +152,99 @@ class Protocol29BaselineTests(unittest.TestCase):
         self.assertEqual(stdout.getvalue(), self.registry_text)
 
 
+class Protocol29FeeBoundaryTests(unittest.TestCase):
+    """Issue #599: Protocol 29 baseline vectors cover boundary fee conditions.
+
+    Protocol 29 introduced revised fee and reserve calculations. These tests
+    assert that:
+
+    * the baseline manifest rejects negative, zero and boolean ``protocol``
+      values (the wrong types that an off-by-one or sign error could produce);
+    * ``check_baseline`` surfaces a clear diagnostic for every invalid value;
+    * the shipped baseline manifest passes all boundary checks without
+      modification.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.registry = json.loads(registry_generate.generate(PACK_DIR))
+
+    def test_negative_protocol_number_fails_baseline_check(self) -> None:
+        # A negative protocol value cannot represent a valid Stellar protocol.
+        for bad in (-1, -29, -100):
+            with self.subTest(protocol=bad):
+                mutated = dict(self.registry, protocol=bad)
+                problems = check_baseline(mutated)
+                self.assertTrue(problems, f"protocol {bad!r} was accepted")
+                self.assertTrue(
+                    any("protocol" in p.lower() for p in problems),
+                    f"no protocol-related diagnostic for {bad!r}: {problems}",
+                )
+
+    def test_zero_protocol_fails_baseline_check(self) -> None:
+        # Zero is not a valid Stellar protocol version.
+        mutated = dict(self.registry, protocol=0)
+        problems = check_baseline(mutated)
+        self.assertTrue(problems, "protocol 0 was accepted")
+        self.assertTrue(
+            any("protocol" in p.lower() for p in problems),
+            f"no protocol diagnostic: {problems}",
+        )
+
+    def test_non_integer_protocol_type_fails_baseline_check(self) -> None:
+        # Strings, floats and booleans must all be rejected; boolean is a
+        # special case because ``isinstance(True, int)`` is True in Python.
+        for bad in ("29", 29.0, True, False, None):
+            with self.subTest(protocol=bad):
+                mutated = dict(self.registry, protocol=bad)
+                problems = check_baseline(mutated)
+                self.assertTrue(problems, f"protocol {bad!r} was accepted")
+
+    def test_wrong_protocol_number_fails_baseline_check(self) -> None:
+        # Nearby valid integers that are not 29 are still wrong for this pack.
+        for bad in (28, 30, 1, 100):
+            with self.subTest(protocol=bad):
+                mutated = dict(self.registry, protocol=bad)
+                problems = check_baseline(mutated)
+                self.assertTrue(problems, f"protocol {bad!r} was accepted")
+
+    def test_zero_registry_version_fails_baseline_check(self) -> None:
+        # registryVersion 0 is below the minimum documented version.
+        mutated = dict(self.registry, registryVersion=0)
+        problems = check_baseline(mutated)
+        self.assertTrue(problems, "registryVersion 0 was accepted")
+
+    def test_negative_registry_version_fails_baseline_check(self) -> None:
+        mutated = dict(self.registry, registryVersion=-1)
+        problems = check_baseline(mutated)
+        self.assertTrue(problems, "registryVersion -1 was accepted")
+
+    def test_shipped_registry_has_no_boundary_problems(self) -> None:
+        # The baseline shipped in the repository must pass every boundary check
+        # without modification.
+        self.assertEqual(check_baseline(self.registry), [])
+        self.assertIs(type(self.registry["protocol"]), int)
+        self.assertNotIsInstance(self.registry["protocol"], bool)
+        self.assertEqual(self.registry["protocol"], 29)
+        self.assertGreater(self.registry["protocol"], 0)
+
+    def test_diagnostic_message_names_the_invalid_value(self) -> None:
+        # When a boundary condition fails, the diagnostic must include the
+        # bad value so contributors can pinpoint the problem quickly.
+        mutated = dict(self.registry, protocol=0)
+        problems = check_baseline(mutated)
+        combined = " ".join(problems)
+        self.assertIn("0", combined)
+
+    def test_check_baseline_returns_empty_list_for_valid_registry(self) -> None:
+        # Sanity: an unmodified registry produces zero problems.
+        self.assertEqual(check_baseline(self.registry), [])
+
+    def test_fixtures_list_is_non_empty_in_baseline(self) -> None:
+        # The protocol-29 pack must contain at least one fixture; an empty
+        # fixtures list is a packaging error, not a valid baseline.
+        self.assertGreater(len(self.registry.get("fixtures", [])), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

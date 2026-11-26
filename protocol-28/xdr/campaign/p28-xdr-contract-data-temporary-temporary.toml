@@ -1,0 +1,62 @@
+# Protocol 28 / LedgerEntry: a `CONTRACT_DATA` entry with TEMPORARY durability round-trips.
+#
+# What this tests:
+# a `CONTRACT_DATA` ledger entry: `lastModifiedLedgerSeq` 1_234_569, the
+# `CONTRACT_DATA` discriminant (6), and a `ContractDataEntry` with a V0
+# `ExtensionPoint`, a synthetic contract `SCAddress`, the `ScVal` key
+# `Symbol("counter")`, TEMPORARY durability (0) and the `ScVal` value
+# `U32(42)`.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct ContractDataEntry` — Stellar-ledger-entries.x lines 490-497; `enum
+#     ContractDataDurability` — lines 485-488 (`TEMPORARY = 0`, `PERSISTENT =
+#     1`); `union SCAddress` — Stellar-contract.x lines 206-222; `union SCVal`
+#     — Stellar-contract.x lines 254-316.
+#   * `enum LedgerEntryType` — Stellar-ledger-entries.x lines 92-104;
+#   * `struct LedgerEntry` (lastModifiedLedgerSeq, the data union and the ext
+#     union) — lines 548-586.
+#
+# Why it matters:
+# `ContractDataDurability` decides whether stored contract data is evicted on
+# the temporary or persistent TTL track. TEMPORARY is the zero discriminant, so
+# a decoder that defaults the enum or confuses the two arms silently changes
+# the entry's lifetime. The key and value are kept from the baseline fixture so
+# only the durability field distinguishes the cases.
+#
+# Expected result and where it comes from: kind = "roundtrip" means a decoder
+# must accept this entry and re-encoding it must reproduce value_base64 byte for
+# byte, not merely an equal value. The payload was produced by a program that
+# builds the typed value with the official `stellar-xdr 28.0.1` crate (features
+# base64, alloc and std) and serialises it with
+# to_xdr_base64(Limits::none()), never hand-assembled. Generation expression,
+# recorded verbatim:
+#
+#   LedgerEntry { last_modified_ledger_seq: 1_234_569, data: LedgerEntryData::ContractData(ContractDataEntry { ext: ExtensionPoint::V0, contract: ScAddress::Contract(ContractId(Hash([0x22; 32]))), key: ScVal::Symbol(ScSymbol::try_from(b"counter".to_vec()).unwrap()), durability: ContractDataDurability::Temporary, val: ScVal::U32(42) }), ext: LedgerEntryExt::V0 }
+#
+# Crate: stellar-xdr 28.0.1; rustc 1.98.1 (48a229cea 2026-09-01); generated
+# 2026-11-24 (UTC). The same program asserted the crate's own round trip:
+# from_xdr returned Ok and re-encoding the decoded value reproduced the
+# encoding exactly.
+#
+# Is it deterministic: yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Every payload byte is a synthetic structural value, not a capture of a real
+# ledger entry and not a contract or stored value that exists on any network:
+# the 0x22-filled contract id is a fixed placeholder, no secret key is used or
+# represented anywhere, and the symbol, U32 and ledger number are arbitrary
+# constants. Nothing here was observed on a network.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x
+
+id = "p28-xdr-contract-data-temporary-temporary"
+protocol = 28
+surface = "xdr"
+category = "campaign"
+description = "A `CONTRACT_DATA` `LedgerEntry` with TEMPORARY durability (0), symbol key `counter` and U32 value 42 round-trips"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-ledger-entries.x"
+
+type = "LedgerEntry"
+kind = "roundtrip"
+value_base64 = "ABLWiQAAAAYAAAAAAAAAASIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiAAAADwAAAAdjb3VudGVyAAAAAAAAAAADAAAAKgAAAAA="

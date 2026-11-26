@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-trustline-alphanum12-alphanum12",
+  "fixtureSha256": "a61a64cede4606aa2763709b714f03522105ba69445b28485ce7ddf6f56b34e6",
+  "method": "structural",
+  "checkedAt": "2026-11-24T13:54:48Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "de09586b69e9d758d49f42c5980e85a720b67705"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

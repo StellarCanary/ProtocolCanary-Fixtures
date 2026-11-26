@@ -346,5 +346,148 @@ class TestReleaseManifestOutputSafety(unittest.TestCase):
         self.assertIn("target is a directory", err)
 
 
+class TestParentTraversalOutputPaths(unittest.TestCase):
+    """Issue #597: output path resolver behaviour with relative ``..`` traversal.
+
+    ``tools/common/paths.canonical_path`` uses ``os.path.realpath`` so it
+    resolves every ``..`` segment, including chains that escape the directory
+    the path starts under.  ``check_target_safety`` then compares the resolved
+    target against each protected input, so a path that navigates *into* a
+    protected file through any number of ``..`` hops is still caught.
+    """
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    # ---- canonical_path with multiple traversals ----------------------------
+
+    def test_canonical_path_resolves_multiple_parent_references(self) -> None:
+        # Three levels up from a/b/c then back in: a/b/c/../../../sibling
+        # resolves to <root>/sibling, not to something that keeps the ``..``.
+        (self.root / "a" / "b" / "c").mkdir(parents=True)
+        path = self.root / "a" / "b" / "c" / ".." / ".." / ".." / "other.txt"
+        expected = os.path.normcase(
+            os.path.realpath(str(self.root / "other.txt"))
+        )
+        self.assertEqual(paths.canonical_path(path), expected)
+        self.assertNotIn("..", paths.canonical_path(path))
+
+    def test_canonical_path_resolves_to_root_via_many_ups(self) -> None:
+        # a/b/../.. collapses back to <root>, deterministically.
+        (self.root / "a" / "b").mkdir(parents=True)
+        path = self.root / "a" / "b" / ".." / ".."
+        expected = os.path.normcase(os.path.realpath(str(self.root)))
+        self.assertEqual(paths.canonical_path(path), expected)
+
+    def test_canonical_path_escape_resolves_deterministically_outside_root(self) -> None:
+        # Enough ``..`` segments to escape the temp directory entirely.
+        # The result must be a consistent absolute path with no ``..`` in it.
+        path = self.root / ".." / ".." / ".." / "escape.txt"
+        result = paths.canonical_path(path)
+        self.assertNotIn("..", result)
+        # The escaped path differs from the same filename inside the root.
+        inside = paths.canonical_path(self.root / "escape.txt")
+        self.assertNotEqual(result, inside)
+
+    def test_safe_subpath_with_traversal_resolves_deterministically(self) -> None:
+        # sub/a/../b/out.json and sub/b/out.json identify the same location.
+        (self.root / "sub" / "a").mkdir(parents=True)
+        (self.root / "sub" / "b").mkdir()
+        path1 = self.root / "sub" / "a" / ".." / "b" / "out.json"
+        path2 = self.root / "sub" / "b" / "out.json"
+        self.assertEqual(paths.canonical_path(path1), paths.canonical_path(path2))
+
+    # ---- check_target_safety with deep traversals ---------------------------
+
+    def test_check_target_safety_catches_fixture_via_two_level_traversal(self) -> None:
+        # sub/deep/../../sub/fixture.toml ultimately resolves to sub/fixture.toml.
+        (self.root / "sub" / "deep").mkdir(parents=True)
+        f = self.root / "sub" / "fixture.toml"
+        f.write_text("content", encoding="utf-8")
+        traversal = (
+            self.root / "sub" / "deep" / ".." / ".." / "sub" / "fixture.toml"
+        )
+        with self.assertRaises(ValueError) as caught:
+            paths.check_target_safety(traversal, [(f, "a pack fixture")])
+        self.assertIn("refusing to write", str(caught.exception))
+
+    def test_check_target_safety_catches_fixture_via_three_level_traversal(self) -> None:
+        # Navigate three levels up from deep inside the tree to reach the fixture.
+        (self.root / "sub" / "a" / "b").mkdir(parents=True)
+        protected = self.root / "important.toml"
+        protected.write_text("important", encoding="utf-8")
+        traversal = (
+            self.root / "sub" / "a" / "b" / ".." / ".." / ".." / "important.toml"
+        )
+        with self.assertRaises(ValueError):
+            paths.check_target_safety(traversal, [(protected, "a release archive")])
+
+    def test_safe_path_with_traversal_is_allowed_when_it_misses_protected_files(self) -> None:
+        # If the traversal resolves to a *different* path, no error is raised.
+        (self.root / "sub" / "a").mkdir(parents=True)
+        protected = self.root / "fixture.toml"
+        protected.write_text("content", encoding="utf-8")
+        # sub/a/../out.json resolves to sub/out.json — not the protected file.
+        safe_target = self.root / "sub" / "a" / ".." / "out.json"
+        # Should not raise.
+        paths.check_target_safety(safe_target, [(protected, "a pack fixture")])
+
+    def test_path_escaping_to_sibling_directory_is_rejected_when_matching(self) -> None:
+        # An output path that uses ``..`` to escape the pack directory and
+        # land on the archive is still caught by identity comparison.
+        (self.root / "pack" / "rpc").mkdir(parents=True)
+        archive = self.root / "releases" / "out.tar.gz"
+        archive.parent.mkdir()
+        archive.write_bytes(b"fake archive data")
+        # Navigate from inside pack/ up two levels and into releases/.
+        traversal = (
+            self.root / "pack" / "rpc" / ".." / ".." / "releases" / "out.tar.gz"
+        )
+        with self.assertRaises(ValueError) as caught:
+            paths.check_target_safety(traversal, [(archive, "the release archive")])
+        self.assertIn("refusing to write", str(caught.exception))
+
+    # ---- registry generator with multi-level traversal paths ----------------
+
+    def test_registry_generator_refuses_fixture_via_deep_traversal(self) -> None:
+        # Provide a deep ``..``-traversal path that resolves to the fixture.
+        # The generator's output-safety check must still reject it.
+        import contextlib
+        import io as _io
+
+        from tools.registry import generate
+
+        tmp2 = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp2.cleanup)
+        root2 = Path(tmp2.name)
+
+        pack_dir = root2 / "protocol-28"
+        pack_dir.mkdir()
+        rpc_dir = pack_dir / "rpc"
+        rpc_dir.mkdir()
+        payload = rpc_dir / "sample.bin"
+        payload.write_bytes(b"payload")
+        fixture = rpc_dir / "p28-rpc-deep.toml"
+        fixture.write_text(
+            'id = "p28-rpc-deep"\nprotocol = 28\nsurface = "rpc"\n'
+            'category = "smoke"\ndescription = "traversal test"\n'
+            'source_reference = "CAP-0083"\n\n[expect]\nkind = "rpc-response"\n',
+            encoding="utf-8",
+        )
+        fixture_bytes = fixture.read_bytes()
+
+        # rpc/subdir/../../rpc/p28-rpc-deep.toml resolves to the fixture.
+        (rpc_dir / "subdir").mkdir()
+        traversal = rpc_dir / "subdir" / ".." / ".." / "rpc" / "p28-rpc-deep.toml"
+
+        out, err = _io.StringIO(), _io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = generate.main([str(pack_dir), "--output", str(traversal)])
+        self.assertEqual(code, 1)
+        self.assertEqual(fixture.read_bytes(), fixture_bytes)
+
+
 if __name__ == "__main__":
     unittest.main()

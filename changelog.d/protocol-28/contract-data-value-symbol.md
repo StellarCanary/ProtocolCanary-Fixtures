@@ -1,0 +1,1 @@
+- Add a Protocol 28 `LedgerEntry` fixture for a `CONTRACT_DATA` entry with an `SCV_U32(7)` key and a nonempty `SCV_SYMBOL("key")` value, exercising the reciprocal of the baseline key/value layout, generated with the official `stellar-xdr` 28.0.1 crate.

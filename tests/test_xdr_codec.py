@@ -93,6 +93,136 @@ class XdrCodecUnitTests(unittest.TestCase):
         with self.assertRaises(xdr_codec.XdrCodecError):
             xdr_codec.decode_stellar_value(bad_sv)
 
+    def test_truncated_base64_strings_raise_decoding_errors(self) -> None:
+        # Every proper prefix of a valid payload is either invalid base64 or a
+        # shortened byte string that the XDR decoder must reject (issue #585).
+        fixtures = {
+            "StellarValue": base64.b64encode(
+                base64.b64decode("EREREREREREREREREREREREREREREREREREREREREREAAAAAaOd4AAAAAAAAAAAA")
+            ).decode("ascii"),
+            "ContractExecutable": base64.b64encode(
+                base64.b64decode("AAAAAgAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVQAAAAhmbGVldC12MQ==")
+            ).decode("ascii"),
+        }
+        for type_name, encoded in fixtures.items():
+            for length in range(len(encoded)):
+                with self.subTest(type_name=type_name, base64_length=length):
+                    with self.assertRaises(ValueError):
+                        # validate=True turns non-alphabet characters and a
+                        # misplaced/absent '=' into binascii.Error (a ValueError).
+                        raw = base64.b64decode(encoded[:length], validate=True)
+                        xdr_codec.decode_xdr(type_name, raw)
+
+    def test_truncated_base64_payload_is_a_descriptive_xdr_error(self) -> None:
+        # A prefix aligned to 4 base64 characters is valid base64 but decodes
+        # to a truncated XDR payload, so the decode error names the truncation.
+        encoded = "EREREREREREREREREREREREREREREREREREREREREREAAAAAaOd4AAAAAAAAAAAA"
+        with self.assertRaises(xdr_codec.XdrCodecError) as caught:
+            raw = base64.b64decode(encoded[:44], validate=True)
+            xdr_codec.decode_xdr("StellarValue", raw)
+        self.assertIn("truncated input", str(caught.exception))
+
+    def test_invalid_base64_padding_rejected(self) -> None:
+        # Missing padding, and padding that is not at the end of the string,
+        # is a base64 decoding error before any XDR decoding happens.
+        for bad in ("AAAAAQ", "AAAAAQ===", "ERER=ERER", "AAAA=AQ=="):
+            with self.subTest(payload=bad):
+                with self.assertRaises(ValueError):
+                    base64.b64decode(bad, validate=True)
+
+    def test_invalid_union_discriminants_raise_value_error(self) -> None:
+        # Each case carries a valid prologue followed by a discriminant that
+        # the XDR definition does not allow (issue #585).
+        def u32(value: int) -> bytes:
+            return value.to_bytes(4, "big")
+
+        cases = {
+            "ContractExecutableType": (
+                "ContractExecutable",
+                u32(3),
+                "ContractExecutableType",
+            ),
+            "StellarValueType": (
+                "StellarValue",
+                (b"\x11" * 32) + (100).to_bytes(8, "big") + u32(0) + u32(99),
+                "StellarValueType",
+            ),
+            "SCAddressType": (
+                "ContractExecutable",
+                u32(2) + u32(99),
+                "SCAddressType",
+            ),
+            "ClaimableBalanceIDType": (
+                "ContractExecutable",
+                u32(2) + u32(3) + u32(1),
+                "ClaimableBalanceIDType",
+            ),
+            "EnvelopeType": (
+                "TransactionEnvelope",
+                u32(99),
+                "EnvelopeType",
+            ),
+            "CryptoKeyType": (
+                "TransactionEnvelope",
+                u32(xdr_codec.ENVELOPE_TYPE_TX) + u32(99),
+                "CryptoKeyType",
+            ),
+            "PublicKeyType": (
+                "StellarValue",
+                (b"\x11" * 32)
+                + (100).to_bytes(8, "big")
+                + u32(0)
+                + u32(xdr_codec.STELLAR_VALUE_SIGNED)
+                + u32(99),
+                "PublicKeyType",
+            ),
+            "PreconditionType": (
+                "TransactionEnvelope",
+                u32(xdr_codec.ENVELOPE_TYPE_TX)
+                + u32(xdr_codec.KEY_TYPE_ED25519)
+                + (b"\x11" * 32)
+                + u32(100)
+                + (1).to_bytes(8, "big")
+                + u32(99),
+                "PreconditionType",
+            ),
+            "MemoType": (
+                "TransactionEnvelope",
+                u32(xdr_codec.ENVELOPE_TYPE_TX_V0)
+                + (b"\x11" * 32)
+                + u32(100)
+                + (1).to_bytes(8, "big")
+                + u32(0)
+                + u32(99),
+                "MemoType",
+            ),
+            "AssetType": (
+                "TransactionEnvelope",
+                u32(xdr_codec.ENVELOPE_TYPE_TX_V0)
+                + (b"\x11" * 32)
+                + u32(100)
+                + (1).to_bytes(8, "big")
+                + u32(0)
+                + u32(xdr_codec.MEMO_NONE)
+                + u32(1)
+                + u32(0)
+                + u32(xdr_codec.OPERATION_TYPE_PAYMENT)
+                + u32(xdr_codec.KEY_TYPE_ED25519)
+                + (b"\x11" * 32)
+                + u32(99),
+                "AssetType",
+            ),
+        }
+        for label, (type_name, payload, union_name) in cases.items():
+            with self.subTest(union=label):
+                with self.assertRaises(xdr_codec.XdrCodecError) as caught:
+                    xdr_codec.decode_xdr(type_name, payload)
+                message = str(caught.exception)
+                self.assertIn("discriminant", message)
+                self.assertIn(union_name, message)
+                # XdrCodecError is the codec's ValueError subclass.
+                self.assertIsInstance(caught.exception, ValueError)
+
     def test_non_zero_padding_rejected(self) -> None:
         # String length 3, followed by 3 chars, plus 1 padding byte which must be 0
         # ContractExecutable ExternalRef

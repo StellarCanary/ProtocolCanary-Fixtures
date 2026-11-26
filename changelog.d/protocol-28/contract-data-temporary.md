@@ -1,0 +1,1 @@
+- Add a Protocol 28 `LedgerEntry` fixture for a `CONTRACT_DATA` entry with `TEMPORARY` durability (0), preserving the baseline `Symbol("counter")` key and `U32(42)` value, generated with the official `stellar-xdr` 28.0.1 crate.
