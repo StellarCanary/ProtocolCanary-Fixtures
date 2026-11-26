@@ -1,0 +1,1 @@
+- Add Protocol 28 XDR fixtures for empty, maximum, and over-limit `TransactionV1Envelope.signatures` vectors, with a documented one-word count mutation and focused offline verification.

@@ -1,0 +1,75 @@
+# Protocol 28 / TransactionEnvelope: absent TransactionV0 time bounds round-trip.
+#
+# What this tests:
+# An ENVELOPE_TYPE_TX_V0 envelope whose `TransactionV0.timeBounds` pointer is
+# absent. Every typed value is identical to the reference-only
+# `p28-xdr-transaction-envelope-v0-roundtrip` baseline except that
+# `time_bounds: Some(TimeBounds { ... })` becomes `time_bounds: None`.
+#
+# Why it matters: an absent optional pointer removes both uint64 fields and a
+# presence flag, shifting the offset of Memo and every later field by 16
+# bytes. A decoder that reads stale bytes as TimeBounds, or that rejects a
+# zero presence flag, would mis-handle legacy transactions with no time
+# bounds.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct TransactionV0` — Stellar-transaction.x lines 902-922;
+#   * `TimeBounds* timeBounds;` in that struct;
+#   * `struct TimeBounds` — Stellar-transaction.x lines 787-791;
+#   * `struct TransactionV0Envelope` — Stellar-transaction.x lines 924-930;
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010.
+#
+# Expected result and where it comes from: kind = "roundtrip" means the value
+# must decode and re-encode byte for byte. The payload was generated with the
+# official `stellar-xdr` 28.0.1 crate (features base64, alloc and std),
+# rustc 1.98.1 (48a229cea 2026-09-01), on 2026-11-22 (UTC), by building the
+# typed value below and serialising it with to_xdr_base64(Limits::none()):
+#
+#   TransactionEnvelope::TxV0(TransactionV0Envelope {
+#       tx: TransactionV0 {
+#           source_account_ed25519: Uint256([0x11; 32]),
+#           fee: 100,
+#           seq_num: SequenceNumber(1_234_567),
+#           time_bounds: None,
+#           memo: Memo::None,
+#           operations: vec![Operation {
+#               source_account: None,
+#               body: OperationBody::Payment(PaymentOp {
+#                   destination: MuxedAccount::Ed25519(Uint256([0x22; 32])),
+#                   asset: Asset::Native,
+#                   amount: 1_000,
+#               }),
+#           }].try_into().unwrap(),
+#           ext: TransactionV0Ext::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0x33; 4]),
+#           signature: Signature(BytesM::try_from(vec![0x33; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   })
+#
+# The same crate decoded the 196-byte encoding, compared the decoded value to
+# the constructed value, and reproduced the bytes exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Every byte is a synthetic structural value, not a capture of a real network
+# object. The account keys are placeholders, the 0x33-filled hint and
+# signature are not a signature made by any key (no secret key is used
+# anywhere), and the fee, sequence number and amount are arbitrary fixed
+# numbers. The signature does not sign anything.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-transaction-v0-null-timebounds-absent"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A TransactionV0 envelope with absent time bounds round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAAABERERERERERERERERERERERERERERERERERERERERERAAAAZAAAAAAAEtaHAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIAAAAAAAAAAAAAA+gAAAAAAAAAATMzMzMAAABAMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMw=="

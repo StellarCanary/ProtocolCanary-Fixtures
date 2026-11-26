@@ -1,0 +1,1 @@
+- Add a Protocol 28 XDR fixture for a muxed `FeeBumpTransaction.feeSource`, preserving the inner envelope and exercising the composite key layout.

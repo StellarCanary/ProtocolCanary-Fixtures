@@ -1,0 +1,89 @@
+# Protocol 28 / TransactionEnvelope: a muxed outer fee source round-trips.
+#
+# What this tests:
+# An ENVELOPE_TYPE_TX_FEE_BUMP envelope whose outer
+# `FeeBumpTransaction.feeSource` is the composite KEY_TYPE_MUXED_ED25519 arm:
+# discriminant 256, uint64 id 7, then the 32-byte key. Every other typed value
+# matches the reference-only `p28-xdr-transaction-envelope-fee-bump-roundtrip`
+# baseline; the inner envelope is preserved unchanged.
+#
+# Why it matters: the baseline only exercises a classic Ed25519 fee source.
+# The muxed arm inserts an eight-byte id before the key and changes every
+# subsequent offset, so a decoder that assumes the classic layout would read
+# the inner envelope at the wrong position.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct FeeBumpTransaction` — Stellar-transaction.x lines 975-991;
+#   * `MuxedAccount feeSource;` in that struct;
+#   * `union MuxedAccount` — Stellar-transaction.x lines 20-31;
+#   * `enum CryptoKeyType` (KEY_TYPE_MUXED_ED25519 = 0x100) — Stellar-types.x lines 29-38;
+#   * `union TransactionEnvelope` — Stellar-transaction.x lines 1001-1010.
+#
+# Expected result and where it comes from: kind = "roundtrip" means the value
+# must decode and re-encode byte for byte. The payload was generated with the
+# official `stellar-xdr` 28.0.1 crate (features base64, alloc and std),
+# rustc 1.98.1 (48a229cea 2026-09-01), on 2026-11-22 (UTC), by building the
+# typed value below and serialising it with to_xdr_base64(Limits::none()):
+#
+#   TransactionEnvelope::TxFeeBump(FeeBumpTransactionEnvelope {
+#       tx: FeeBumpTransaction {
+#           fee_source: MuxedAccount::MuxedEd25519(MuxedAccountMed25519 {
+#               id: 7,
+#               ed25519: Uint256([0xcc; 32]),
+#           }),
+#           fee: 200_000,
+#           inner_tx: FeeBumpTransactionInnerTx::Tx(TransactionV1Envelope {
+#               tx: Transaction {
+#                   source_account: MuxedAccount::Ed25519(Uint256([0x99; 32])),
+#                   fee: 100_000,
+#                   seq_num: SequenceNumber(4_567_890),
+#                   cond: Preconditions::None,
+#                   memo: Memo::None,
+#                   operations: vec![Operation {
+#                       source_account: None,
+#                       body: OperationBody::Payment(PaymentOp {
+#                           destination: MuxedAccount::Ed25519(Uint256([0xaa; 32])),
+#                           asset: Asset::Native,
+#                           amount: 3_000,
+#                       }),
+#                   }].try_into().unwrap(),
+#                   ext: TransactionExt::V0,
+#               },
+#               signatures: vec![DecoratedSignature {
+#                   hint: SignatureHint([0xbb; 4]),
+#                   signature: Signature(BytesM::try_from(vec![0xbb; 64]).unwrap()),
+#               }].try_into().unwrap(),
+#           }),
+#           ext: FeeBumpTransactionExt::V0,
+#       },
+#       signatures: vec![DecoratedSignature {
+#           hint: SignatureHint([0xdd; 4]),
+#           signature: Signature(BytesM::try_from(vec![0xdd; 64]).unwrap()),
+#       }].try_into().unwrap(),
+#   })
+#
+# The same crate decoded the 336-byte encoding, compared the decoded value to
+# the constructed value, and reproduced the bytes exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Every byte is a synthetic structural value, not a capture of a real network
+# object. The 0xcc, 0x99 and 0xaa keys are placeholders, and the 0xbb and 0xdd
+# hints and signatures are not signatures made by any key (no secret key is
+# used anywhere). The fees, sequence number and amount are arbitrary fixed
+# numbers. The signatures do not sign anything.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x
+
+id = "p28-xdr-fee-bump-muxed-source-muxed"
+protocol = 28
+surface = "xdr"
+category = "transaction-envelope"
+description = "A fee-bump envelope whose outer fee source is a muxed Ed25519 account round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-transaction.x"
+
+type = "TransactionEnvelope"
+kind = "roundtrip"
+value_base64 = "AAAABQAAAQAAAAAAAAAAB8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAAAADDUAAAAACAAAAAJmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZAAGGoAAAAAAARbNSAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqoAAAAAAAAAAAAAC7gAAAAAAAAAAbu7u7sAAABAu7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7uwAAAAAAAAAB3d3d3QAAAEDd3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d"

@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-signature-count-empty",
+  "fixtureSha256": "39adbd3dfd25732be2c3d8fb7f6d900d909c36c526550942ef7b0b51c2bf8617",
+  "method": "structural",
+  "checkedAt": "2026-11-22T16:01:43Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "249b523f90d820917564550d6018c988ce4a8536"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}
