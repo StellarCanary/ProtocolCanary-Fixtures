@@ -18,12 +18,8 @@ class CF02VectorTests(unittest.TestCase):
 
     def test_multi_operation_envelopes_validation(self) -> None:
         """Verify that multi-operation envelopes containing both Soroban contract calls and classic operations validate cleanly."""
-        schema = json.loads(CF02_SCHEMA_PATH.read_text(encoding="utf-8"))
-        
-        # Locate CF-02 vector files if present, or validate test envelope structure
         vector_files = list(CF02_VECTORS_DIR.glob("*.json")) if CF02_VECTORS_DIR.is_dir() else []
         
-        # Construct or verify a sample multi-operation envelope complying with CF-02
         envelope = {
             "transaction_hash": "0" * 64,
             "operations": [
@@ -33,8 +29,7 @@ class CF02VectorTests(unittest.TestCase):
             "result_codes": ["op_success", "success"]
         }
         
-        # Assert operation order preservation and result mapping
-        self.assertEqual(len(envelope["operations"]), 2);
+        self.assertEqual(len(envelope["operations"]), 2)
         self.assertEqual(envelope["operations"][0]["type"], "payment")
         self.assertEqual(envelope["operations"][1]["type"], "invoke_host_function")
         self.assertEqual(len(envelope["result_codes"]), len(envelope["operations"]))
