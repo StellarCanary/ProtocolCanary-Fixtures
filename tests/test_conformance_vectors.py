@@ -81,6 +81,26 @@ class ConformanceVectorTests(unittest.TestCase):
         self.assertEqual(boundary_data["sequence_number"], 0)
         self.assertEqual(boundary_data["args"], [])
 
+    def test_soroban_vectors_cover_expect_and_error_diagnostics(self) -> None:
+        """Soroban conformance vectors cover both valid expectations and Soroban error diagnostics."""
+        accepted_soroban = [
+            v for v in self.manifest["accepted"] if v["surface"] == "soroban"
+        ]
+        rejected_soroban = [
+            v for v in self.manifest["rejected"] if v["surface"] == "soroban"
+        ]
+        self.assertGreater(len(accepted_soroban), 0)
+        self.assertGreater(len(rejected_soroban), 0)
+
+        for vector in accepted_soroban:
+            data = tomllib.loads((VECTORS_DIR / vector["path"]).read_text(encoding="utf-8"))
+            self.assertEqual(data["surface"], "soroban")
+            self.assertIsInstance(data.get("expect"), dict)
+
+        rejected_codes = {vector["error_code"] for vector in rejected_soroban}
+        self.assertIn("unknown-soroban-expect-key", rejected_codes)
+        self.assertIn("wrong-soroban-message-type", rejected_codes)
+
     def test_each_vector_has_its_documented_validator_outcome(self) -> None:
         for vector in self.vectors:
             with self.subTest(vector=vector["id"]):

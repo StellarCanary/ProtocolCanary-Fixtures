@@ -1,0 +1,59 @@
+# Protocol 28 / CAP-0085: an external reference with an account owner round-trips.
+#
+# What this tests:
+# A `ContractExecutable::ExternalRef` whose `executable_owner` is the account
+# layout: SC_ADDRESS_TYPE_ACCOUNT (0), then PUBLIC_KEY_TYPE_ED25519 (0), then
+# exactly 32 key bytes. The tag stays `fleet-v1` from the reference-only
+# `p28-xdr-cap85-external-ref-roundtrip` baseline; only the owner layout
+# changes.
+#
+# Why it matters: the baseline uses an SC_ADDRESS_TYPE_CONTRACT owner, which
+# has no nested PublicKey discriminant. An account owner inserts that
+# discriminant and changes the offset of the tag, so this is a layout-only
+# check. It makes no claim that a host accepts an account-owned external
+# reference.
+#
+# Definitions (stellar/stellar-xdr at tag v28.0, commit 9c9c145953e80990d6ff1ae3a6a973a0ce6d0694):
+#
+#   * `struct ContractExecutableExternalRef` — Stellar-contract.x lines 224-227;
+#   * `union SCAddress switch (SCAddressType type)` — Stellar-contract.x lines 85-95;
+#   * `union PublicKey switch (PublicKeyType type)` — Stellar-types.x lines 53-57;
+#   * `union ContractExecutable` — Stellar-contract.x lines 229-237.
+#
+# Expected result and where it comes from: kind = "roundtrip" means the value
+# must decode and re-encode byte for byte. The payload was generated with the
+# official `stellar-xdr` 28.0.1 crate (features base64, alloc and std),
+# rustc 1.98.1 (48a229cea 2026-09-01), on 2026-11-22 (UTC), by building the
+# typed value below and serialising it with to_xdr_base64(Limits::none()):
+#
+#   ContractExecutable::ExternalRef(ContractExecutableExternalRef {
+#       executable_owner: ScAddress::Account(AccountId(
+#           PublicKey::PublicKeyTypeEd25519(Uint256([0x66; 32])),
+#       )),
+#       tag: ScString::try_from(b"fleet-v1".to_vec()).unwrap(),
+#   })
+#
+# The same crate decoded the 56-byte encoding, compared the decoded value to
+# the constructed value, and reproduced the bytes exactly.
+#
+# Is it deterministic: Yes. The generator uses no randomness, clock or
+# network; the same expression always yields the same bytes.
+#
+# Every byte is a synthetic structural value, not a capture of a real network
+# object. The 0x66-filled key is a placeholder, not a real account or secret,
+# and the tag is an arbitrary fixed string. This fixture proves the wire
+# layout round-trips; it does not demonstrate deployed contract state or host
+# acceptance.
+#
+# Definition: https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x
+
+id = "p28-xdr-external-ref-account-owner-account"
+protocol = 28
+surface = "xdr"
+category = "cap-0085"
+description = "A CAP-0085 external reference with an account executable owner round-trips byte-for-byte"
+source_reference = "https://github.com/stellar/stellar-xdr/blob/9c9c145953e80990d6ff1ae3a6a973a0ce6d0694/Stellar-contract.x"
+
+type = "ContractExecutable"
+kind = "roundtrip"
+value_base64 = "AAAAAgAAAAAAAAAAZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmYAAAAIZmxlZXQtdjE="

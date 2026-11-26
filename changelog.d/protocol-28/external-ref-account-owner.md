@@ -1,0 +1,1 @@
+- Add a Protocol 28 CAP-0085 XDR fixture for a `ContractExecutableExternalRef` account owner, covering the nested public-key discriminant layout.

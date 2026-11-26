@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-transaction-v0-null-timebounds-absent",
+  "fixtureSha256": "a0649fcf1b9a269cefe3df4e4c5b3ff1bfb01763c6fb56acfaacc6740d597924",
+  "method": "structural",
+  "checkedAt": "2026-11-22T16:01:43Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "249b523f90d820917564550d6018c988ce4a8536"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

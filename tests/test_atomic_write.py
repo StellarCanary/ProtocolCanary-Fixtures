@@ -9,10 +9,14 @@ Run with: python3 -m unittest discover tests
 
 from __future__ import annotations
 
+import gzip
 import hashlib
+import io
+import json
 import os
 import subprocess
 import sys
+import tarfile
 import tempfile
 import threading
 import unittest
@@ -29,6 +33,12 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 # A full 40-character lowercase git commit hash: tools/release/manifest.py
 # requires one, and rejects anything shorter.
 REVISION = "0123456789abcdef0123456789abcdef01234567"
+
+# The protocol-28 release artifacts built by BaselineHashTest (F-081).
+ARCHIVE_NAME = "protocolcanary-fixtures-1.0.0.tar.gz"
+MANIFEST_NAME = "protocolcanary-fixtures-1.0.0.manifest.json"
+CHECKSUM_NAME = "protocolcanary-fixtures-1.0.0.tar.gz.sha256"
+REGISTRY_NAME = "registry-v1.json"
 
 
 def _temp_files(directory: str) -> list[str]:
@@ -392,14 +402,26 @@ class ToolOutputConsistencyTest(unittest.TestCase):
 class BaselineHashTest(unittest.TestCase):
     """The release artifacts must stay byte-for-byte identical (F-081).
 
-    These are the SHA-256 hashes the four protocol-28 release artifacts had
-    *before* the atomic-write change. The atomic write must not alter a
-    single byte of any of them: it changes how the bytes reach the disk, not
+    These are the SHA-256 hashes the protocol-28 release content had *before*
+    the atomic-write change. The atomic write must not alter a
+    single byte of any of it: it changes how the bytes reach the disk, not
     which bytes they are. A change here is a release-integrity regression --
     a consumer pinning these hashes would break, and a consumer verifying a
     checksum against a half-written archive would be defeated.
 
-    The values were recorded by building the same four artifacts from
+    Only the bytes this repository's own code produces are pinned: the tar
+    stream inside the gzip wrapper (sorted entries, fixed metadata, mtime 0),
+    the generated registry, and the pack digest they carry. The .tar.gz, the
+    manifest and the .sha256 file also depend on the zlib implementation of
+    the Python build that wrote them (docs/archive-reproducibility.md, "What
+    is enforced, and what is not"), so pinning their own bytes would fail on a
+    runner whose deflate stream differs even though nothing in the repository
+    changed -- that is why the archive-baseline workflow reports the
+    compressed digest and never enforces it. Those three artifacts are checked
+    against the archive that was just built instead, which is the property
+    that has to hold on every platform.
+
+    The values were recorded by building the same artifacts from
     upstream/main at ec10f95, before this branch changed any tool, and
     re-recorded on 2026-11-20 when the Protocol 28 ScVal schema, null-map,
     scalar-endpoint and wide-integer fixtures (issues #503-#506) changed the
@@ -422,10 +444,11 @@ class BaselineHashTest(unittest.TestCase):
     (issues #510-#513), and for the operation arms, footprint arms,
     StellarValue closeTime boundaries, and V1 integer boundaries fixtures
     (issues #547, #548, #559, #560), and for the CLAWBACK and
-    SET_TRUST_LINE_FLAGS operation fixtures (issues #551, #552), and for the
-    Protocol 30 CAP-88 and Protocol 28 AccountEntry, signer and trustline
-    boundary fixtures (issues #517, #524, #525, #527): a content change
-    legitimately moves all four hashes,
+    SET_TRUST_LINE_FLAGS operation fixtures (issues #551, #552), and on
+    2026-11-26 when merging main brought in the #674 fixtures and this branch
+    added the signature-count, time-bounds, fee-bump muxed-source and CAP-0085
+    ExternalRef fixtures (issues #533, #535, #536, #537): a content change
+    legitimately moves every pinned hash,
     while the property being pinned stays the same -- the atomic write
     reproduces whatever bytes the tools produce.
 
@@ -436,17 +459,24 @@ class BaselineHashTest(unittest.TestCase):
             --output D/protocolcanary-fixtures-1.0.0.manifest.json \
             --sha256-file D/protocolcanary-fixtures-1.0.0.tar.gz.sha256
         python3 tools/registry/generate.py protocol-28 --output D/registry-v1.json
+    The tar-stream value is the SHA-256 of that archive decompressed:
+        python3 -c "import gzip,hashlib,sys;print(hashlib.sha256(
+            gzip.decompress(open(sys.argv[1],'rb').read())).hexdigest())" \
+            D/protocolcanary-fixtures-1.0.0.tar.gz
+    The pack digest is the ``packDigest`` the manifest records.
     """
 
+    # Content, not compression: these are the bytes this repository's tools
+    # produce, so every platform and Python version in the CI matrix produces
+    # them too (the archive-baseline workflow enforces the tar-stream digest
+    # across the whole matrix).
     BASELINE = {
-        "protocolcanary-fixtures-1.0.0.tar.gz":
-            "b4e5982e96ee7357b8cb02d10a1d223306f56937a93a9020953330808a926607",
-        "protocolcanary-fixtures-1.0.0.manifest.json":
-            "f2732366a0e59c2a7cb55a5aa42246e03c652c09f77998bcdacbdd7fb9f59ff2",
-        "protocolcanary-fixtures-1.0.0.tar.gz.sha256":
-            "262c5bf83e0e0b93783c955f995d36f197f8f30849d89709950b8b011bb9a3f3",
+        "tar-stream":
+            "6cd473b845253604de5be36d2321a860914777c3fbf837e95adbeb610e1a1d7c",
         "registry-v1.json":
-            "874176e99471af2312e66077b099c7f1ba1f6ca2ecf6c71e97f68980d5303de0",
+            "6d07a718e6b5f4cbe4f4d39a80211c04efc4c89bb0e9e32708057186c4509323",
+        "pack-digest":
+            "sha256:3ea5efb03b5fe080c3dec4530c705559bc2bf69eea2faddd0d05895100c6e016",
     }
 
     def setUp(self) -> None:
@@ -483,29 +513,60 @@ class BaselineHashTest(unittest.TestCase):
             "--output", str(self.dist / "registry-v1.json"),
         )
 
-    def test_the_release_artifacts_match_the_baseline_hashes(self) -> None:
-        """Every protocol-28 release artifact keeps its pre-change SHA-256."""
-        self.build_artifacts()
+    def archive_bytes(self) -> bytes:
+        """The archive that was just built, or a failure naming the tool."""
+        path = self.dist / ARCHIVE_NAME
+        self.assertTrue(path.is_file(), f"{ARCHIVE_NAME} was not produced")
+        return path.read_bytes()
 
-        for name, expected in self.BASELINE.items():
+    def test_the_release_content_matches_the_baseline_hashes(self) -> None:
+        """The bytes this repository's tools produce keep their SHA-256."""
+        self.build_artifacts()
+        stream = gzip.decompress(self.archive_bytes())
+        produced = (
+            ("tar-stream", stream),
+            (REGISTRY_NAME, (self.dist / REGISTRY_NAME).read_bytes()),
+        )
+
+        for name, content in produced:
             with self.subTest(artifact=name):
-                path = self.dist / name
-                self.assertTrue(path.is_file(), f"{name} was not produced")
-                actual = hashlib.sha256(path.read_bytes()).hexdigest()
                 self.assertEqual(
-                    actual, expected,
+                    hashlib.sha256(content).hexdigest(), self.BASELINE[name],
                     f"{name} changed: the atomic write must not alter any byte",
                 )
+
+        manifest = json.loads((self.dist / MANIFEST_NAME).read_text(encoding="utf-8"))
+        self.assertEqual(
+            manifest["packDigest"], self.BASELINE["pack-digest"],
+            "the pack digest changed: a fixture or the atomic write altered a byte",
+        )
         self.assertEqual(_temp_files(str(self.dist)), [])
 
     def test_the_checksum_file_names_the_archive_hash(self) -> None:
-        """The manifest checksum file pins the archive's own SHA-256."""
+        """The checksum file pins the hash of the archive that was built."""
         self.build_artifacts()
-        expected = self.BASELINE["protocolcanary-fixtures-1.0.0.tar.gz"]
-        line = (self.dist / "protocolcanary-fixtures-1.0.0.tar.gz.sha256").read_text(
-            encoding="utf-8"
+        archive_hash = hashlib.sha256(self.archive_bytes()).hexdigest()
+        line = (self.dist / CHECKSUM_NAME).read_text(encoding="utf-8")
+        self.assertIn(archive_hash, line)
+
+    def test_the_manifest_describes_the_archive_it_names(self) -> None:
+        """The manifest's archive block matches the archive it was built from."""
+        self.build_artifacts()
+        archive = self.archive_bytes()
+        manifest = json.loads((self.dist / MANIFEST_NAME).read_text(encoding="utf-8"))
+
+        self.assertEqual(manifest["archive"]["file"], ARCHIVE_NAME)
+        self.assertEqual(
+            manifest["archive"]["sha256"], hashlib.sha256(archive).hexdigest()
         )
-        self.assertIn(expected, line)
+        self.assertEqual(manifest["archive"]["bytes"], len(archive))
+        with tarfile.open(fileobj=io.BytesIO(gzip.decompress(archive))) as tar:
+            members = tar.getmembers()
+        self.assertEqual(manifest["archive"]["entries"], len(members))
+        self.assertEqual(
+            manifest["archive"]["uncompressedBytes"],
+            sum(member.size for member in members if member.isreg()),
+        )
 
 
 if __name__ == "__main__":
