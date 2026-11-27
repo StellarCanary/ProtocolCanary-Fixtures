@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p30-xdr-cap0088-stellar-value-empty-tx-set-ms-999ms",
+  "fixtureSha256": "d38eba6a86ea5048e16bc26f7f7905ce69b9075619b5adbc20a17d31b1390a95",
+  "method": "structural",
+  "checkedAt": "2026-11-24T19:23:03Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "784d4fd391507661f629e4d35dbb04b812ba3f13"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

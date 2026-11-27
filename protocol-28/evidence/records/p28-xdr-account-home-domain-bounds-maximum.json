@@ -1,0 +1,13 @@
+{
+  "verificationVersion": 1,
+  "fixtureId": "p28-xdr-account-home-domain-bounds-maximum",
+  "fixtureSha256": "d5ecd68bb769dbc1ad79e36ce4df2a4ff6a2f4a88823863f3459d4b56f87dcc4",
+  "method": "structural",
+  "checkedAt": "2026-11-24T19:21:15Z",
+  "verifier": {
+    "name": "protocolcanary-fixtures-validate",
+    "version": "784d4fd391507661f629e4d35dbb04b812ba3f13"
+  },
+  "outcome": "matched",
+  "evidenceRef": null
+}

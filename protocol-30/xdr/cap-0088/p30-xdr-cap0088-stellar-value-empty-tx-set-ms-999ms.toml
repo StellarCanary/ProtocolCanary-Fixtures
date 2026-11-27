@@ -1,0 +1,32 @@
+# Protocol 30 structural StellarValue vector for CAP-88's STELLAR_VALUE_EMPTY_TX_SET_MS arm.
+#
+# close_time_ms is 1_700_000_123_999, leaving a 999 millisecond remainder.
+# CAP-88 requires close_time == close_time_ms / 1000, so close_time is
+# 1_700_000_123. Rounding to nearest would produce 1_700_000_124 and is
+# therefore excluded by this floor-division vector.
+#
+# The expected bytes were obtained by building the typed value below with
+# the official stellar-xdr 30.0.0 Rust crate and serialising it with
+# to_xdr_base64(Limits::none()); the same program asserted that decoding
+# and re-encoding the value reproduced these bytes exactly.
+# Construction expression: StellarValue { tx_set_hash: Hash([0; 32]), close_time: TimePoint(1_700_000_123), upgrades: VecM::try_from(Vec::new()).unwrap(), ext: StellarValueExt::EmptyTxSetMs(StellarValueProposedMsValue { close_time_ms: TimePointMs(1_700_000_123_999), tx_set_hash: Hash([0x33; 32]), previous_ledger_hash: Hash([0x44; 32]), previous_ledger_version: 30, lc_value_signature: LedgerCloseValueSignature { node_id: NodeId(PublicKey::PublicKeyTypeEd25519(Uint256([0x66; 32]))), signature: Signature(BytesM::try_from(vec![0x55; 64]).unwrap()) } }) }
+# Crate: stellar-xdr 30.0.0; rustc 1.98.1 (48a229cea 2026-09-01); generated 2026-11-24 (UTC).
+#
+# The node id and 64-byte signature are deterministic sentinels. They are
+# not cryptographically verified and do not represent a consensus vote.
+# This is a synthetic offline XDR structure, not a live observation, and
+# it proves neither host acceptance nor Protocol 30 conformance.
+#
+# CAP-88: https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md
+# Generated XDR types: https://github.com/stellar/rs-stellar-xdr/blob/v30.0.0/src/generated/stellar_value_ext.rs
+
+id = "p30-xdr-cap0088-stellar-value-empty-tx-set-ms-999ms"
+protocol = 30
+surface = "xdr"
+category = "cap-0088"
+description = "A StellarValue with a 999 ms remainder in STELLAR_VALUE_EMPTY_TX_SET_MS uses the preceding whole second"
+source_reference = "https://github.com/stellar/stellar-protocol/blob/1ae39233055a0fb94bb737650a39ede8d77d924c/core/cap-0088.md"
+
+type = "StellarValue"
+kind = "roundtrip"
+value_base64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZVPxewAAAAAAAAAEAAABi8/nTF8zMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzM0REREREREREREREREREREREREREREREREREREREREREAAAAHgAAAABmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZgAAAEBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV"

@@ -1,0 +1,1 @@
+- Add a Protocol 28 trustline fixture for the pool-share TrustLineAsset arm.
