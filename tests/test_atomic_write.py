@@ -447,7 +447,9 @@ class BaselineHashTest(unittest.TestCase):
     SET_TRUST_LINE_FLAGS operation fixtures (issues #551, #552), and on
     2026-11-26 when merging main brought in the #674 fixtures and this branch
     added the signature-count, time-bounds, fee-bump muxed-source and CAP-0085
-    ExternalRef fixtures (issues #533, #535, #536, #537): a content change
+    ExternalRef fixtures (issues #533, #535, #536, #537), and for the Protocol 30
+    CAP-88 and Protocol 28 AccountEntry, signer and trustline boundary fixtures
+    (issues #517, #524, #525, #527): a content change
     legitimately moves every pinned hash,
     while the property being pinned stays the same -- the atomic write
     reproduces whatever bytes the tools produce.
@@ -472,11 +474,11 @@ class BaselineHashTest(unittest.TestCase):
     # across the whole matrix).
     BASELINE = {
         "tar-stream":
-            "6cd473b845253604de5be36d2321a860914777c3fbf837e95adbeb610e1a1d7c",
+            "181e89a0f622df1dfea73b6672930ffa469b6d536610b9de465fe20ea91007a2",
         "registry-v1.json":
-            "6d07a718e6b5f4cbe4f4d39a80211c04efc4c89bb0e9e32708057186c4509323",
+            "19ee9408fba8fdd4a24e6ecb623b94d2128aad31ebdd3e350708a67ce0131930",
         "pack-digest":
-            "sha256:3ea5efb03b5fe080c3dec4530c705559bc2bf69eea2faddd0d05895100c6e016",
+            "sha256:2cbe66079997a5f7679a07c488296a159aac5703e71de0d327353bb37b4f026a",
     }
 
     def setUp(self) -> None:
